@@ -71,4 +71,4 @@ Contributions are welcome! If you'd like to improve BotCraft, please follow thes
 Distributed under the MIT License. See `LICENSE` for more information.
 
 ---
-*Developed with ❤️ by [Ranit](https://github.com/Ranit68)*
+*Developed with ❤️ by [Sayan](https://github.com/Ranit68)*
