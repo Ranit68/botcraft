@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="300dp"
+    android:height="300dp"
+    android:viewportWidth="300"
+    android:viewportHeight="300">
+    <!-- Section 1: Pink - 200 CR -->
+    <path
+        android:fillColor="#F06292"
+        android:pathData="M150,150 L150,0 A150,150 0 0,1 271.35,61.8 Z" />
+    <!-- Section 2: Yellow - Premium Char -->
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M150,150 L271.35,61.8 A150,150 0 0,1 271.35,238.2 Z" />
+    <!-- Section 3: Blue - 100 CR -->
+    <path
+        android:fillColor="#42A5F5"
+        android:pathData="M150,150 L271.35,238.2 A150,150 0 0,1 150,300 Z" />
+    <!-- Section 4: Purple - Common Char -->
+    <path
+        android:fillColor="#7E57C2"
+        android:pathData="M150,150 L150,300 A150,150 0 0,1 28.65,238.2 Z" />
+    <!-- Section 5: Dark Gray/Black - Better Luck -->
+    <path
+        android:fillColor="#424242"
+        android:pathData="M150,150 L28.65,238.2 A150,150 0 0,1 150,0 Z" />
+    
+    <!-- Outer Border -->
+    <path
+        android:strokeWidth="4"
+        android:strokeColor="#33FFFFFF"
+        android:pathData="M150,150 m-150,0 a150,150 0 1,1 300,0 a150,150 0 1,1 -300,0" />
+</vector>

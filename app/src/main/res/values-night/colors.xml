@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark Mode Palette -->
+    <color name="bg_main">#0F1115</color>
+    <color name="bg_card">#1A1D24</color>
+    <color name="bg_input">#24272E</color>
+    <color name="text_main">#FFFFFF</color>
+    <color name="text_hint">#6B6B6F</color>
+    <color name="text_label">#9AA0A6</color>
+    <color name="stroke_input">#3A3F4B</color>
+    <color name="accent_purple">#B3A9FF</color>
+
+    <!-- Splash Specific (Dark) -->
+    <color name="splash_icon_bg">#1A1D24</color>
+    <color name="splash_text_main">#FFFFFF</color>
+    <color name="splash_tagline">#B3A9FF</color>
+    <color name="splash_status_bg">#1AFFFFFF</color>
+    <color name="splash_status_text">#99FFFFFF</color>
+</resources>

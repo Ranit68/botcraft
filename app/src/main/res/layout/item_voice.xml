@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/llVoiceContainer"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="12dp"
+    android:gravity="center_vertical"
+    android:layout_marginVertical="4dp"
+    android:layout_marginHorizontal="8dp"
+    android:background="@drawable/bg_search_bar">
+
+    <ImageView
+        android:id="@+id/ivPlayPreview"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:padding="8dp"
+        android:src="@android:drawable/ic_media_play"
+        app:tint="@color/primary"
+        android:background="@drawable/bg_circle_light" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:layout_marginStart="12dp">
+
+        <TextView
+            android:id="@+id/tvVoiceName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Voice Name"
+            android:textColor="@color/text_main"
+            android:textSize="16sp"
+            android:fontFamily="@font/poppins_bold" />
+
+        <TextView
+            android:id="@+id/tvVoiceLabels"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Female • Romantic • US Accent"
+            android:textColor="@color/text_hint"
+            android:textSize="12sp"
+            android:fontFamily="@font/poppins_regular" />
+    </LinearLayout>
+
+    <View
+        android:id="@+id/vSelectionIndicator"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:background="@drawable/bg_circle"
+        android:backgroundTint="@color/stroke_input" />
+
+</LinearLayout>

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="320dp"
+    android:layout_height="match_parent"
+    android:layout_marginVertical="8dp"
+    android:layout_marginEnd="16dp"
+    app:cardBackgroundColor="@color/bg_card"
+    app:cardCornerRadius="28dp"
+    app:cardElevation="0dp">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <View
+            android:id="@+id/imgSkeleton"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/stroke_input" />
+
+        <View
+            android:id="@+id/badgeSkeleton"
+            android:layout_width="80dp"
+            android:layout_height="18dp"
+            android:layout_marginStart="20dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/bg_skeleton"
+            android:backgroundTint="#E0E0E0"
+            app:layout_constraintBottom_toTopOf="@id/nameSkeleton"
+            app:layout_constraintStart_toStartOf="parent" />
+
+        <View
+            android:id="@+id/nameSkeleton"
+            android:layout_width="150dp"
+            android:layout_height="24dp"
+            android:layout_marginStart="20dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/bg_skeleton"
+            android:backgroundTint="#D0D0D0"
+            app:layout_constraintBottom_toTopOf="@id/descSkeleton"
+            app:layout_constraintStart_toStartOf="parent" />
+
+        <View
+            android:id="@+id/descSkeleton"
+            android:layout_width="220dp"
+            android:layout_height="16dp"
+            android:layout_marginStart="20dp"
+            android:layout_marginBottom="24dp"
+            android:background="@drawable/bg_skeleton"
+            android:backgroundTint="#E0E0E0"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</androidx.cardview.widget.CardView>

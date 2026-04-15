@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:fillViewport="true">
+
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        app:cardBackgroundColor="@color/bg_card"
+        app:cardCornerRadius="28dp"
+        app:cardElevation="0dp">
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="24dp">
+
+            <TextView
+                android:id="@+id/tvTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Select Membership"
+                android:textColor="@color/text_main"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <ImageView
+                android:id="@+id/btnClose"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@android:drawable/ic_menu_close_clear_cancel"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:tint="@color/text_hint" />
+
+            <LinearLayout
+                android:id="@+id/llPlans"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:orientation="vertical"
+                app:layout_constraintTop_toBottomOf="@id/tvTitle">
+
+                <!-- Free Plan -->
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:id="@+id/btnPlanFree"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:background="@drawable/bg_plan_unselected"
+                    android:padding="16dp"
+                    android:alpha="0.8">
+
+                    <TextView
+                        android:id="@+id/tvFreeTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Free"
+                        android:textColor="@color/text_main"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
+
+                    <TextView
+                        android:id="@+id/tvFreeBadge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:background="@drawable/bg_badge_trending"
+                        android:paddingHorizontal="6dp"
+                        android:paddingVertical="2dp"
+                        android:text="CURRENT"
+                        android:textColor="@color/white"
+                        android:textSize="9sp"
+                        android:visibility="gone"
+                        app:layout_constraintBottom_toBottomOf="@id/tvFreeTitle"
+                        app:layout_constraintStart_toEndOf="@id/tvFreeTitle"
+                        app:layout_constraintTop_toTopOf="@id/tvFreeTitle" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Start Free, explore your partner"
+                        android:textColor="@color/text_label"
+                        android:textSize="13sp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/tvFreeTitle" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="28dp"
+                        android:text="• 15 messages/day\n• 1 image/day\n• 1 AI Bot creation"
+                        android:textColor="@color/text_hint"
+                        android:textSize="11sp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/tvFreeTitle" />
+                </androidx.constraintlayout.widget.ConstraintLayout>
+
+                <!-- Premium Plan -->
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:id="@+id/btnPlanPremium"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:background="@drawable/bg_plan_unselected"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:id="@+id/tvPremiumTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Premium"
+                        android:textColor="@color/text_main"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
+
+                    <TextView
+                        android:id="@+id/tvPremiumBadge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:background="@drawable/bg_badge_trending"
+                        android:paddingHorizontal="6dp"
+                        android:paddingVertical="2dp"
+                        android:text="CURRENT"
+                        android:textColor="@color/white"
+                        android:textSize="9sp"
+                        android:visibility="gone"
+                        app:layout_constraintBottom_toBottomOf="@id/tvPremiumTitle"
+                        app:layout_constraintStart_toEndOf="@id/tvPremiumTitle"
+                        app:layout_constraintTop_toTopOf="@id/tvPremiumTitle" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:text="100 credits, fast response, better model"
+                        android:textColor="@color/text_label"
+                        android:textSize="13sp"
+                        app:layout_constraintEnd_toStartOf="@id/rbPremium"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/tvPremiumTitle" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="28dp"
+                        android:text="• 100 messages/day\n• 5 images/day\n• 3 AI Bot creations\n• 100 Bonus Credits"
+                        android:textColor="@color/text_hint"
+                        android:textSize="11sp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/tvPremiumTitle" />
+
+                    <RadioButton
+                        android:id="@+id/rbPremium"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:clickable="false"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
+                </androidx.constraintlayout.widget.ConstraintLayout>
+
+                <!-- Ultra Plan -->
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:id="@+id/btnPlanUltra"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:background="@drawable/bg_plan_unselected"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:id="@+id/tvUltraTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Ultra"
+                        android:textColor="@color/text_main"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
+
+                    <TextView
+                        android:id="@+id/tvUltraBadge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:background="@drawable/bg_badge_trending"
+                        android:paddingHorizontal="6dp"
+                        android:paddingVertical="2dp"
+                        android:text="CURRENT"
+                        android:textColor="@color/white"
+                        android:textSize="9sp"
+                        android:visibility="gone"
+                        app:layout_constraintBottom_toBottomOf="@id/tvUltraTitle"
+                        app:layout_constraintStart_toEndOf="@id/tvUltraTitle"
+                        app:layout_constraintTop_toTopOf="@id/tvUltraTitle" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:text="Ultimate experience, unlimited creation"
+                        android:textColor="@color/text_label"
+                        android:textSize="13sp"
+                        app:layout_constraintEnd_toStartOf="@id/rbUltra"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/tvUltraTitle" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="28dp"
+                        android:text="• 300 messages/day\n• Unlimited images\n• Unlimited AI Bots\n• 200 Bonus Credits"
+                        android:textColor="@color/text_hint"
+                        android:textSize="11sp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/tvUltraTitle" />
+
+                    <RadioButton
+                        android:id="@+id/rbUltra"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:clickable="false"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
+                </androidx.constraintlayout.widget.ConstraintLayout>
+
+            </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnUpgradeConfirm"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="24dp"
+                android:text="Upgrade Now"
+                android:textAllCaps="false"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                app:cornerRadius="16dp"
+                app:layout_constraintTop_toBottomOf="@id/llPlans" />
+
+            <ProgressBar
+                android:id="@+id/loading"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:visibility="gone"
+                app:layout_constraintBottom_toBottomOf="@id/btnUpgradeConfirm"
+                app:layout_constraintEnd_toEndOf="@id/btnUpgradeConfirm"
+                app:layout_constraintStart_toStartOf="@id/btnUpgradeConfirm"
+                app:layout_constraintTop_toTopOf="@id/btnUpgradeConfirm" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+    </androidx.cardview.widget.CardView>
+</androidx.core.widget.NestedScrollView>
