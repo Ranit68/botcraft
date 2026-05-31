@@ -345,6 +345,18 @@
                         android:textColor="@color/text_main"
                         android:textSize="14sp"
                         app:backgroundTint="@null" />
+
+                    <Button
+                        android:id="@+id/btnPickWallpaperGallery"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:layout_marginTop="12dp"
+                        android:background="@drawable/bg_google_button"
+                        android:text="Pick from Gallery"
+                        android:textAllCaps="false"
+                        android:textColor="@color/text_main"
+                        android:textSize="14sp"
+                        app:backgroundTint="@null" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 

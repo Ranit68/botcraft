@@ -2,10 +2,12 @@ package com.ranit.botscraft.ui;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.text.InputType;
 import android.util.Log;
 import android.util.Patterns;
 import android.view.View;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Button;
 import android.widget.Toast;
@@ -29,6 +31,8 @@ import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GoogleAuthProvider;
 import com.google.firebase.firestore.FirebaseFirestore;
 
+import java.util.ArrayList;
+
 public class LoginActivity extends AppCompatActivity {
 
     private static final String TAG = "LoginActivity";
@@ -36,26 +40,39 @@ public class LoginActivity extends AppCompatActivity {
 
     EditText etEmail, etPassword;
     Button btnLogin;
-    TextView tvRegister, forget;
+    TextView tvRegister, forget, tvVerificationNotice;
     View btnGoogle;
+    ImageView ivPasswordToggle;
 
     FirebaseAuth auth;
     GoogleSignInClient mGoogleSignInClient;
+    
+    private boolean isPasswordVisible = false;
 
     private final ActivityResultLauncher<Intent> googleSignInLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
-                if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                Log.d(TAG, "Google Launcher result code: " + result.getResultCode());
+                if (result.getData() != null) {
                     Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(result.getData());
                     try {
                         GoogleSignInAccount account = task.getResult(ApiException.class);
-                        if (account != null) {
+                        if (account != null && account.getIdToken() != null) {
+                            Log.d(TAG, "Google Sign-In success, getting ID token...");
                             firebaseAuthWithGoogle(account.getIdToken());
+                        } else {
+                            Log.e(TAG, "Google Sign-In failed: No ID Token found");
+                            Toast.makeText(this, "Google Sign-In failed: No ID Token", Toast.LENGTH_SHORT).show();
                         }
                     } catch (ApiException e) {
-                        Log.e(TAG, "Google sign in failed", e);
-                        Toast.makeText(this, "Google sign in failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        Log.e(TAG, "Google sign in failed. Code: " + e.getStatusCode() + " Msg: " + e.getMessage());
+                        // Common Codes: 10 = Developer Error (SHA-1/Package Mismatch), 7 = Network, 12500 = Sign-in failed
+                        String friendlyError = "Google sign in failed: " + e.getStatusCode();
+                        if (e.getStatusCode() == 10) friendlyError = "Developer Error (10): Check SHA-1 in Firebase Console";
+                        Toast.makeText(this, friendlyError, Toast.LENGTH_LONG).show();
                     }
+                } else {
+                    Log.e(TAG, "Google Launcher data is null. Result Code: " + result.getResultCode());
                 }
             }
     );
@@ -70,6 +87,10 @@ public class LoginActivity extends AppCompatActivity {
         initViews();
         setupGoogleSignIn();
         setupListeners();
+
+        if (getIntent().getBooleanExtra("showVerificationNotice", false)) {
+            tvVerificationNotice.setVisibility(View.VISIBLE);
+        }
     }
 
     private void initViews() {
@@ -79,6 +100,8 @@ public class LoginActivity extends AppCompatActivity {
         tvRegister = findViewById(R.id.tvRegister);
         forget = findViewById(R.id.tvForgotPassword);
         btnGoogle = findViewById(R.id.btnGoogle);
+        ivPasswordToggle = findViewById(R.id.ivPasswordToggle);
+        tvVerificationNotice = findViewById(R.id.tvVerificationNotice);
     }
 
     private void setupGoogleSignIn() {
@@ -94,41 +117,68 @@ public class LoginActivity extends AppCompatActivity {
         tvRegister.setOnClickListener(v -> startActivity(new Intent(this, RegisterActivity.class)));
         forget.setOnClickListener(v -> startActivity(new Intent(this, ForgotPasswordActivity.class)));
         btnGoogle.setOnClickListener(v -> signInWithGoogle());
+        
+        ivPasswordToggle.setOnClickListener(v -> togglePasswordVisibility());
+    }
+
+    private void togglePasswordVisibility() {
+        if (isPasswordVisible) {
+            etPassword.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+            ivPasswordToggle.setImageResource(R.drawable.ic_eye_hidden);
+        } else {
+            etPassword.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+            ivPasswordToggle.setImageResource(R.drawable.ic_eye_visible);
+        }
+        isPasswordVisible = !isPasswordVisible;
+        etPassword.setSelection(etPassword.getText().length());
     }
 
     private void signInWithGoogle() {
-        Intent signInIntent = mGoogleSignInClient.getSignInIntent();
-        googleSignInLauncher.launch(signInIntent);
+        mGoogleSignInClient.signOut().addOnCompleteListener(this, task -> {
+            Intent signInIntent = mGoogleSignInClient.getSignInIntent();
+            googleSignInLauncher.launch(signInIntent);
+        });
     }
 
     private void firebaseAuthWithGoogle(String idToken) {
+        Log.d(TAG, "firebaseAuthWithGoogle: starting Firebase auth...");
         setLoading(true);
         AuthCredential credential = GoogleAuthProvider.getCredential(idToken, null);
         auth.signInWithCredential(credential)
                 .addOnCompleteListener(this, task -> {
                     if (task.isSuccessful()) {
+                        Log.d(TAG, "Firebase Auth with Google SUCCESS");
                         FirebaseUser user = auth.getCurrentUser();
                         checkUserInFirestore(user);
                     } else {
+                        Log.e(TAG, "Firebase Auth with Google FAILED", task.getException());
                         setLoading(false);
-                        Toast.makeText(this, "Authentication Failed.", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, "Authentication Failed: " + (task.getException() != null ? task.getException().getMessage() : "Unknown"), Toast.LENGTH_LONG).show();
                     }
                 });
     }
 
     private void checkUserInFirestore(FirebaseUser user) {
-        if (user == null) return;
+        if (user == null) {
+            Log.e(TAG, "checkUserInFirestore: User is null");
+            setLoading(false);
+            return;
+        }
+        Log.d(TAG, "Checking user in Firestore: " + user.getUid());
         FirebaseFirestore.getInstance().collection("users").document(user.getUid()).get()
                 .addOnSuccessListener(documentSnapshot -> {
                     if (documentSnapshot.exists()) {
+                        Log.d(TAG, "User exists in Firestore, redirecting to Main");
                         setLoading(false);
                         startActivity(new Intent(this, MainActivity.class));
                         finish();
                     } else {
+                        Log.d(TAG, "User NOT in Firestore, creating new profile...");
                         createNewUserProfile(user);
                     }
                 })
                 .addOnFailureListener(e -> {
+                    Log.e(TAG, "Firestore check FAILED", e);
                     setLoading(false);
                     Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 });
@@ -145,7 +195,11 @@ public class LoginActivity extends AppCompatActivity {
         newUser.name = username;
         newUser.username = username;
         newUser.email = user.getEmail();
+        newUser.imageUrl = user.getPhotoUrl() != null ? user.getPhotoUrl().toString() : "";
+
         newUser.plan = "free";
+        newUser.subscriptionStart = System.currentTimeMillis();
+        newUser.subscriptionEnd = System.currentTimeMillis() + (365L * 24 * 60 * 60 * 1000); 
         newUser.credits = 50;
         newUser.dailyMessageCount = 0;
         newUser.dailyImageCount = 0;
@@ -157,6 +211,8 @@ public class LoginActivity extends AppCompatActivity {
         newUser.lastResetDate = System.currentTimeMillis();
         newUser.createdAt = System.currentTimeMillis();
         newUser.active = true;
+        newUser.blockedBots = new ArrayList<>();
+        newUser.notificationsEnabled = true;
 
         FirebaseFirestore.getInstance().collection("users").document(user.getUid()).set(newUser)
                 .addOnSuccessListener(aVoid -> {
@@ -207,10 +263,12 @@ public class LoginActivity extends AppCompatActivity {
                     if (!auth.getCurrentUser().isEmailVerified()) {
                         auth.signOut();
                         setLoading(false);
+                        tvVerificationNotice.setVisibility(View.VISIBLE);
                         Toast.makeText(this, "Please verify your email before login", Toast.LENGTH_LONG).show();
                         return;
                     }
 
+                    tvVerificationNotice.setVisibility(View.GONE);
                     setLoading(false);
                     startActivity(new Intent(this, MainActivity.class));
                     finish();

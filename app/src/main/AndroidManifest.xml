@@ -3,9 +3,11 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="com.android.vending.BILLING" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
     <application
         android:allowBackup="true"
@@ -19,11 +21,6 @@
         android:theme="@style/Theme.Chstbot"
         android:usesCleartextTraffic="true">
 
-        <!-- AdMob App ID (Test ID) -->
-        <meta-data
-            android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713"/>
-        
         <activity
             android:name="com.ranit.botscraft.ForgotPasswordActivity"
             android:exported="false" />
@@ -48,6 +45,10 @@
         <activity
             android:name="com.ranit.botscraft.ui.BuyCreditsActivity"
             android:exported="false" />
+
+        <activity
+            android:name="com.ranit.botscraft.ui.SecurityActivity"
+            android:exported="false" />
             
         <activity
             android:name="com.ranit.botscraft.ui.SplashActivity"
@@ -62,12 +63,15 @@
             android:name="com.ranit.botscraft.ui.MainActivity"
             android:exported="true"
             android:windowSoftInputMode="adjustResize" />
-            
         <activity
             android:name="com.ranit.botscraft.ui.ImageViewerActivity"
             android:exported="false"
             android:theme="@style/Theme.ImageViewer" />
-            
+
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-2446534560156295~9658852450"/>
+
     </application>
 
 </manifest>

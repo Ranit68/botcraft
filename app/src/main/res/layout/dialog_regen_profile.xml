@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@color/bg_card"
+    android:background="@drawable/bg_dialog_rounded"
     android:orientation="vertical"
     android:padding="24dp">
 
@@ -13,28 +13,30 @@
         android:layout_height="wrap_content"
         android:text="Regenerate Bot Look"
         android:textColor="@color/text_main"
-        android:textSize="18sp"
+        android:textSize="20sp"
+        android:fontFamily="@font/poppins_bold"
         android:textStyle="bold" />
 
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="6dp"
         android:text="Describe the new look. We will keep her face consistent."
         android:textColor="@color/text_label"
-        android:textSize="12sp" />
+        android:textSize="13sp"
+        android:fontFamily="@font/poppins_medium" />
 
     <!-- Prompt Area with scroll and fixed max height -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="20dp"
         android:background="@drawable/bg_input_field">
 
         <ScrollView
             android:layout_width="match_parent"
-            android:layout_height="160dp"
-            android:padding="4dp">
+            android:layout_height="120dp"
+            android:padding="2dp">
 
             <EditText
                 android:id="@+id/etRegenPrompt"
@@ -46,7 +48,8 @@
                 android:padding="12dp"
                 android:textColor="@color/text_main"
                 android:textColorHint="@color/text_hint"
-                android:textSize="14sp" />
+                android:textSize="14sp"
+                android:fontFamily="@font/poppins_regular" />
         </ScrollView>
     </FrameLayout>
 
@@ -59,27 +62,29 @@
 
         <Button
             android:id="@+id/btnRegenGenerate"
-            android:layout_width="0dp"
-            android:layout_height="56dp"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
             android:layout_weight="1"
             android:background="@drawable/bg_google_button"
             android:text="Preview"
             android:textAllCaps="false"
             android:textColor="@color/text_main"
-            android:textStyle="bold"
+            android:textSize="14sp"
+            android:fontFamily="@font/poppins_bold"
             app:backgroundTint="@null" />
 
         <Button
             android:id="@+id/btnRegenSave"
-            android:layout_width="0dp"
-            android:layout_height="56dp"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
             android:layout_marginStart="12dp"
             android:layout_weight="1"
             android:background="@drawable/bg_signup_button"
-            android:text="Save &amp; Update"
+            android:text="Save"
             android:textAllCaps="false"
             android:textColor="@color/white"
-            android:textStyle="bold"
+            android:textSize="14sp"
+            android:fontFamily="@font/poppins_bold"
             app:backgroundTint="@null" />
 
     </LinearLayout>

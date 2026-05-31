@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingHorizontal="24dp"
+    android:paddingVertical="12dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackground">
+
+    <com.google.android.material.imageview.ShapeableImageView
+        android:id="@+id/imgMyBot"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:scaleType="centerCrop"
+        android:src="@drawable/user"
+        app:shapeAppearanceOverlay="@style/CircleImage"
+        app:strokeColor="@color/primary"
+        app:strokeWidth="1dp" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvMyBotName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Bot Name"
+            android:fontFamily="@font/poppins_bold"
+            android:textColor="@color/text_main"
+            android:textSize="17sp" />
+
+        <TextView
+            android:id="@+id/tvMyBotDetails"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Status"
+            android:alpha="0.6"
+            android:textColor="@color/text_main"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <ImageView
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:alpha="0.4"
+        android:src="@android:drawable/ic_media_play"
+        app:tint="@color/text_main" />
+
+</LinearLayout>

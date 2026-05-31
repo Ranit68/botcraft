@@ -49,17 +49,33 @@ public class HomeActivity extends AppCompatActivity {
         recyclerBots = findViewById(R.id.recyclerBots);
         recyclerBots.setLayoutManager(new LinearLayoutManager(this));
 
-        adapter = new BotAdapter(botList, bot -> {
-            Intent i = new Intent(this, ChatActivity.class);
-            i.putExtra("bot", bot);
-            startActivity(i);
+        adapter = new BotAdapter(botList, new BotAdapter.OnBotClickListener() {
+            @Override
+            public void onChatClick(Bot bot) {
+                if (bot != null) {
+                    bot.sanitizeForIntent();
+                    Intent i = new Intent(HomeActivity.this, ChatActivity.class);
+                    i.putExtra("bot", bot);
+                    startActivity(i);
+                }
+            }
+
+            @Override
+            public void onProfileClick(Bot bot) {
+                if (bot != null) {
+                    bot.sanitizeForIntent();
+                    Intent i = new Intent(HomeActivity.this, BotProfileActivity.class);
+                    i.putExtra("bot", bot);
+                    startActivity(i);
+                }
+            }
         });
         recyclerBots.setAdapter(adapter);
 
         findViewById(R.id.fabCreateBot)
                 .setOnClickListener(v -> checkBotCreationPermission());
 
-        loadBots(); // 🔥 THIS WAS MISSING
+        loadBots();
     }
 
     private void loadBots() {
@@ -78,7 +94,7 @@ public class HomeActivity extends AppCompatActivity {
                     snap.getDocuments().forEach(doc -> {
                         Bot bot = doc.toObject(Bot.class);
                         if (bot != null) {
-                            bot.botId = doc.getId(); // 🔥 REQUIRED
+                            bot.botId = doc.getId();
                             botList.add(bot);
                         }
                     });
@@ -86,8 +102,6 @@ public class HomeActivity extends AppCompatActivity {
                     adapter.notifyDataSetChanged();
                 });
     }
-
-    // ---------- YOUR EXISTING LOGIC (UNCHANGED) ----------
 
     private void checkBotCreationPermission() {
         String uid = FirebaseManager.getUserId();
@@ -149,14 +163,12 @@ public class HomeActivity extends AppCompatActivity {
                     }
                 });
     }
-
     private boolean canCreateBot(String plan, int count) {
         if (plan == null) plan = "free";
         if (plan.equals("free")) return count < 1;
         if (plan.equals("premium")) return count < 3;
         return true;
     }
-
     @Override
     protected void onDestroy() {
         super.onDestroy();

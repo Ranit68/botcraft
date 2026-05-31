@@ -31,7 +31,7 @@ public interface ApiService {
     // =====================================
     // 🔊 VOICE API
     // =====================================
-    @POST("getVoices")
+    @GET("getVoices")
     Call<VoiceListResponse> getVoices(
             @Header("Authorization") String token
     );

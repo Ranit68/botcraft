@@ -9,6 +9,7 @@ public class ChatMessage implements Serializable {
     public String text;
     public String imageUrl;
     public long timestamp;
+    public boolean isLocked;
 
     public ChatMessage() {
         // Required for Firebase

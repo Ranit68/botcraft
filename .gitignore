@@ -76,3 +76,20 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
+
+# Firebase / Google Services
+google-services.json
+app/google-services.json
+firebase-debug.log
+.firebase/
+
+# Keystores / Keys
+*.jks
+*.keystore
+*.p12
+*.key
+/local.properties
+
+# Secrets
+secrets.xml
+credentials.json

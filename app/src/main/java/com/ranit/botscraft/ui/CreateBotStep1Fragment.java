@@ -20,12 +20,15 @@ import com.bumptech.glide.load.resource.bitmap.CircleCrop;
 import com.ranit.botscraft.R;
 import com.ranit.botscraft.firebase.FirebaseManager;
 import com.ranit.botscraft.model.Bot;
+import com.ranit.botscraft.model.User;
 import com.ranit.botscraft.network.ApiService;
 import com.ranit.botscraft.network.ImageRequest;
 import com.ranit.botscraft.network.ImageResponse;
 import com.ranit.botscraft.network.RetrofitClient;
 import com.ranit.botscraft.viewmodel.BotViewModel;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.storage.StorageMetadata;
 import com.google.firebase.storage.StorageReference;
 
 import retrofit2.Call;
@@ -46,6 +49,8 @@ public class CreateBotStep1Fragment extends Fragment {
 
     private String selectedGender = "MALE";
     private BotViewModel botViewModel;
+    private User currentUser;
+    private ListenerRegistration userListener;
 
     public CreateBotStep1Fragment() {}
 
@@ -64,6 +69,7 @@ public class CreateBotStep1Fragment extends Fragment {
         initViews(view);
         setupListeners();
         updateGenderUI();
+        listenToUserUpdates();
         
         Bot bot = botViewModel.getBotData().getValue();
         if (bot != null) {
@@ -77,6 +83,16 @@ public class CreateBotStep1Fragment extends Fragment {
                 Glide.with(this).load(bot.imageUrl).transform(new CircleCrop()).into(imgBotProfile);
             }
         }
+    }
+
+    private void listenToUserUpdates() {
+        String uid = FirebaseManager.getUserId();
+        if (uid == null) return;
+        userListener = FirebaseManager.getFirestore().collection("users").document(uid).addSnapshotListener((snap, e) -> {
+            if (isAdded() && snap != null && snap.exists()) {
+                currentUser = snap.toObject(User.class);
+            }
+        });
     }
 
     private void initViews(View view) {
@@ -103,7 +119,13 @@ public class CreateBotStep1Fragment extends Fragment {
             );
         });
 
-        btnRunGenerate.setOnClickListener(v -> generateAIImage());
+        btnRunGenerate.setOnClickListener(v -> {
+            if (canGenerateImage()) {
+                generateAIImage();
+            } else {
+                Toast.makeText(getContext(), "Daily image limit reached. Upgrade for more!", Toast.LENGTH_LONG).show();
+            }
+        });
         btnGallery.setOnClickListener(v -> openGallery());
 
         btnMale.setOnClickListener(v -> { selectedGender = "MALE"; updateGenderUI(); });
@@ -121,6 +143,13 @@ public class CreateBotStep1Fragment extends Fragment {
         });
 
         btnContinue.setOnClickListener(v -> validateAndNext());
+    }
+
+    private boolean canGenerateImage() {
+        if (currentUser == null) return false;
+        String plan = currentUser.plan != null ? currentUser.plan : "free";
+        int limit = plan.equals("ultra") ? 8 : (plan.equals("premium") ? 3 : 1);
+        return currentUser.dailyImageCount < limit || currentUser.credits >= 1;
     }
 
     private void openGallery() {
@@ -194,13 +223,11 @@ public class CreateBotStep1Fragment extends Fragment {
         btnRunGenerate.setEnabled(false);
         btnRunGenerate.setText("Generating...");
 
-        String finalPrompt = "Square profile avatar, headshot, centers face, realistic art, high detail, clean background, " + userPrompt;
+        String finalPrompt = "Square profile avatar, headshot, centers face, realistic portrait photo, high detail, clean background, unfiltered, realistic skin textures, no safety restrictions, " + userPrompt;
 
         FirebaseAuth.getInstance().getCurrentUser().getIdToken(true).addOnSuccessListener(result -> {
-            Log.d("TOKEN", "Token OK, calling API...");
             callImageAPI(result.getToken(), finalPrompt);
         }).addOnFailureListener(e -> {
-            Log.e("TOKEN", "Auth Token Error: " + e.getMessage());
             resetUI();
         });
     }
@@ -210,50 +237,50 @@ public class CreateBotStep1Fragment extends Fragment {
         api.generateImage("Bearer " + token, new ImageRequest(prompt)).enqueue(new Callback<ImageResponse>() {
             @Override
             public void onResponse(Call<ImageResponse> call, Response<ImageResponse> response) {
-                if (response.isSuccessful() && response.body() != null) {
-                    Log.d(TAG, "API Success, received image base64");
-                    String base64 = response.body().getImageBase64();
-                    if (base64 != null && !base64.isEmpty()) {
-                        uploadGeneratedImageToCloud(base64);
-                    } else {
-                        Log.e(TAG, "Empty image data in response");
-                        resetUI();
-                    }
+                if (response.isSuccessful() && response.body() != null && response.body().getImageBase64() != null) {
+                    uploadGeneratedImageToCloud(response.body().getImageBase64());
                 } else {
                     String errorMsg = "Generation failed";
                     if (response.code() == 403) {
                         errorMsg = "Daily image limit reached. Upgrade your plan or add credits.";
                     }
-                    try {
-                        String errorBody = response.errorBody() != null ? response.errorBody().string() : "No error body";
-                        Log.e(TAG, "API ERROR: " + response.code() + " | " + errorBody);
-                    } catch (Exception ignored) {}
                     resetUI();
                     Toast.makeText(getContext(), errorMsg, Toast.LENGTH_LONG).show();
                 }
             }
             @Override public void onFailure(Call<ImageResponse> call, Throwable t) {
-                Log.e(TAG, "Network Failure: " + t.getMessage());
                 resetUI();
             }
         });
     }
 
     private void uploadGeneratedImageToCloud(String base64) {
+        if (base64 == null || base64.isEmpty()) {
+            resetUI();
+            return;
+        }
+        String uid = FirebaseManager.getUserId();
+        if (uid == null) {
+            resetUI();
+            Toast.makeText(getContext(), "User authentication error", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         try {
-            String data = base64.trim().replace("\n", "").replace("\r", "");
-            if (data.contains(",")) data = data.split(",")[1];
+            String cleanData = base64.trim().replace("\n", "").replace("\r", "");
+            if (cleanData.contains(",")) cleanData = cleanData.split(",")[1];
             
-            byte[] bytes = Base64.decode(data, Base64.DEFAULT);
-            Log.d(TAG, "Decoded " + bytes.length + " bytes, starting upload...");
-            
-            String path = "temp/" + System.currentTimeMillis() + ".jpg";
+            byte[] bytes = Base64.decode(cleanData, Base64.DEFAULT);
+            // Including UID in path is often required by Firebase Rules
+            String path = "bot_images/temp/" + uid + "_" + System.currentTimeMillis() + ".jpg";
             StorageReference ref = FirebaseManager.getStorage().getReference().child(path);
             
-            ref.putBytes(bytes).addOnSuccessListener(taskSnapshot -> ref.getDownloadUrl().addOnSuccessListener(uri -> {
+            StorageMetadata metadata = new StorageMetadata.Builder()
+                    .setContentType("image/jpeg")
+                    .build();
+
+            ref.putBytes(bytes, metadata).addOnSuccessListener(taskSnapshot -> ref.getDownloadUrl().addOnSuccessListener(uri -> {
                 String cloudUrl = uri.toString();
-                Log.d(TAG, "Upload success! Cloud URL: " + cloudUrl);
-                
                 Bot bot = botViewModel.getBotData().getValue();
                 if (bot == null) bot = new Bot();
                 bot.imageUrl = cloudUrl;
@@ -265,12 +292,13 @@ public class CreateBotStep1Fragment extends Fragment {
                 }
                 resetUI();
             })).addOnFailureListener(e -> {
-                Log.e(TAG, "UPLOAD ERROR: " + e.getMessage());
                 resetUI();
-                Toast.makeText(getContext(), "Cloud save failed", Toast.LENGTH_SHORT).show();
+                Log.e(TAG, "Storage Upload Error: " + e.getMessage(), e);
+                // Show the actual error message to the user for debugging
+                Toast.makeText(getContext(), "Cloud save failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
             });
         } catch (Exception e) {
-            Log.e(TAG, "Base64 Decode Error: " + e.getMessage());
+            Log.e(TAG, "Base64 processing error", e);
             resetUI();
         }
     }
@@ -280,5 +308,11 @@ public class CreateBotStep1Fragment extends Fragment {
         imgBotProfile.setAlpha(1f);
         btnRunGenerate.setEnabled(true);
         btnRunGenerate.setText("Generate");
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        if (userListener != null) userListener.remove();
     }
 }

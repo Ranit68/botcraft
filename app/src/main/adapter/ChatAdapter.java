@@ -16,6 +16,13 @@ import com.bumptech.glide.Glide;
 import com.ranit.botscraft.R;
 import com.ranit.botscraft.model.ChatMessage;
 
+import android.graphics.Color;
+import android.text.Spannable;
+import android.text.SpannableStringBuilder;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.StyleSpan;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashSet;

@@ -15,6 +15,11 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import com.google.android.gms.ads.AdRequest;
+import com.google.android.gms.ads.AdSize;
+import com.google.android.gms.ads.AdView;
+import com.google.android.gms.ads.MobileAds;
+
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
@@ -26,9 +31,6 @@ import com.ranit.botscraft.R;
 import com.ranit.botscraft.firebase.FirebaseManager;
 import com.ranit.botscraft.model.User;
 import com.ranit.botscraft.utils.NotificationHelper;
-import com.google.android.gms.ads.AdRequest;
-import com.google.android.gms.ads.AdSize;
-import com.google.android.gms.ads.AdView;
 import com.google.android.material.imageview.ShapeableImageView;
 import com.google.firebase.firestore.ListenerRegistration;
 
@@ -38,19 +40,20 @@ import java.util.Map;
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivityLog";
-    private static final String BANNER_AD_ID = "ca-app-pub-3940256099942544/6300978111"; // Test ID
 
     private View navHome, navChat, navCreate, navProfile;
     private View bgHome, bgChat, bgCreate, bgProfile;
-    private ImageView icHome, icChat, icCreate, icProfile;
+    private ImageView icHome, icChat, icCreate, icProfile, profile;
     private TextView tvHome, tvChat, tvCreate, tvProfile;
     
     private View llCredits;
     private TextView tvUserCredits;
     private ShapeableImageView imgUserProfile;
-    private FrameLayout adContainer;
-    private AdView mAdView;
     private ListenerRegistration userListener;
+    
+    private FrameLayout adContainer;
+    private AdView adView;
+    private static final String BANNER_AD_ID = "ca-app-pub-2446534560156295/4667439718";
 
     private String currentTab = "";
     private final Map<String, Integer> tabIndices = new HashMap<>();
@@ -60,18 +63,31 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        
+        MobileAds.initialize(this, initializationStatus -> {});
 
         initTabIndices();
         initViews();
         setupNavigation();
         setupCredits();
+        loadBannerAd();
 
         if (savedInstanceState == null) {
             selectTab("HOME");
         }
-        
-        // Start the notification cycle
         NotificationHelper.scheduleNextNotification(this);
+    }
+
+    private void loadBannerAd() {
+        if (adContainer == null) return;
+        
+        adView = new AdView(this);
+        adView.setAdUnitId(BANNER_AD_ID);
+        adView.setAdSize(AdSize.BANNER);
+        
+        adContainer.addView(adView);
+        AdRequest adRequest = new AdRequest.Builder().build();
+        adView.loadAd(adRequest);
     }
 
     private void initTabIndices() {
@@ -114,6 +130,10 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(new Intent(MainActivity.this, BuyCreditsActivity.class));
             });
         }
+        
+        if (imgUserProfile != null) {
+            imgUserProfile.setOnClickListener(v -> selectTab("PROFILE"));
+        }
 
         String uid = FirebaseManager.getUserId();
         if (uid != null) {
@@ -124,14 +144,15 @@ public class MainActivity extends AppCompatActivity {
                             User user = snapshot.toObject(User.class);
                             if (user != null) {
                                 if (tvUserCredits != null) tvUserCredits.setText(user.credits + " CR");
-                                
-                                // Update Toolbar Profile Image & Border
-                                updateToolbarProfile(user);
-                                
-                                // Banner Ad Logic
-                                handleBannerAd(user);
 
-                                // Show promo dialog only for Free users who haven't seen it in this session
+                                if (adContainer != null) {
+                                    if ("free".equals(user.plan) || user.plan == null) {
+                                        adContainer.setVisibility(View.VISIBLE);
+                                    } else {
+                                        adContainer.setVisibility(View.GONE);
+                                    }
+                                }
+                                updateToolbarProfile(user);
                                 if (!promoShown && ("free".equals(user.plan) || user.plan == null)) {
                                     showSubscriptionPromo();
                                     promoShown = true;
@@ -142,39 +163,13 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void handleBannerAd(User user) {
-        String plan = user.plan != null ? user.plan : "free";
-        if ("free".equals(plan)) {
-            if (mAdView == null) {
-                mAdView = new AdView(this);
-                mAdView.setAdUnitId(BANNER_AD_ID);
-                mAdView.setAdSize(AdSize.BANNER);
-                adContainer.removeAllViews();
-                adContainer.addView(mAdView);
-                AdRequest adRequest = new AdRequest.Builder().build();
-                mAdView.loadAd(adRequest);
-            }
-            adContainer.setVisibility(View.VISIBLE);
-        } else {
-            adContainer.setVisibility(View.GONE);
-            if (mAdView != null) {
-                mAdView.destroy();
-                mAdView = null;
-            }
-        }
-    }
-
     private void updateToolbarProfile(User user) {
         if (imgUserProfile == null) return;
-
-        // Load image
         if (user.imageUrl != null && !user.imageUrl.isEmpty()) {
             Glide.with(this).load(user.imageUrl).circleCrop().into(imgUserProfile);
         } else {
             imgUserProfile.setImageResource(R.drawable.user);
         }
-
-        // Apply Border based on plan
         String plan = user.plan != null ? user.plan : "free";
         if ("premium".equals(plan)) {
             imgUserProfile.setStrokeWidth(4f);
@@ -295,26 +290,19 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onPause() {
-        if (mAdView != null) {
-            mAdView.pause();
-        }
         super.onPause();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        if (mAdView != null) {
-            mAdView.resume();
-        }
+        if (adView != null) adView.resume();
     }
 
     @Override
     protected void onDestroy() {
-        if (mAdView != null) {
-            mAdView.destroy();
-        }
         super.onDestroy();
+        if (adView != null) adView.destroy();
         if (userListener != null) {
             userListener.remove();
         }

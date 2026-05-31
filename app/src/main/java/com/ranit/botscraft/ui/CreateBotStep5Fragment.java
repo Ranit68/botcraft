@@ -28,8 +28,8 @@ import com.ranit.botscraft.firebase.FirebaseManager;
 import com.ranit.botscraft.model.Bot;
 import com.ranit.botscraft.model.User;
 import com.ranit.botscraft.viewmodel.BotViewModel;
+import com.ranit.botscraft.viewmodel.HomeViewModel;
 import com.google.android.gms.ads.AdRequest;
-import com.google.android.gms.ads.FullScreenContentCallback;
 import com.google.android.gms.ads.LoadAdError;
 import com.google.android.gms.ads.interstitial.InterstitialAd;
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback;
@@ -37,20 +37,23 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.storage.StorageMetadata;
 import com.google.firebase.storage.StorageReference;
 
 public class CreateBotStep5Fragment extends Fragment {
 
     private static final String TAG = "CreateBotStep5";
-    private static final String AD_UNIT_ID = "ca-app-pub-3940256099942544/1033173712"; // Test ID
 
     private ImageView imgBotFinal;
     private TextView tvFinalName, tvFinalDetails, tvFinalRelation, btnBack;
     private Button btnCreate;
     private View loadingOverlay;
     private BotViewModel botViewModel;
-    private InterstitialAd mInterstitialAd;
+    private HomeViewModel homeViewModel;
     private User currentUser;
+    
+    private InterstitialAd mInterstitialAd;
+    private final String INTERSTITIAL_AD_ID = "ca-app-pub-2446534560156295/4605573966";
 
     public CreateBotStep5Fragment() {}
 
@@ -64,6 +67,7 @@ public class CreateBotStep5Fragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         botViewModel = new ViewModelProvider(requireActivity()).get(BotViewModel.class);
+        homeViewModel = new ViewModelProvider(requireActivity()).get(HomeViewModel.class);
         Bot bot = botViewModel.getBotData().getValue();
 
         imgBotFinal = view.findViewById(R.id.imgBotFinal);
@@ -74,7 +78,8 @@ public class CreateBotStep5Fragment extends Fragment {
         btnBack = view.findViewById(R.id.btnBack);
         loadingOverlay = view.findViewById(R.id.loadingOverlay);
 
-        fetchUserAndLoadAd();
+        fetchUser();
+        loadInterstitialAd();
 
         if (bot != null) displayBotReview(bot);
 
@@ -85,51 +90,13 @@ public class CreateBotStep5Fragment extends Fragment {
         });
     }
 
-    private void fetchUserAndLoadAd() {
+    private void fetchUser() {
         String uid = FirebaseManager.getUserId();
         if (uid == null) return;
         FirebaseManager.getFirestore().collection("users").document(uid).get().addOnSuccessListener(doc -> {
             if (!isAdded()) return;
             currentUser = doc.toObject(User.class);
-            if (currentUser != null) {
-                if (!"ultra".equals(currentUser.plan)) {
-                    loadInterstitialAd();
-                }
-            }
         });
-    }
-
-    private void loadInterstitialAd() {
-        AdRequest adRequest = new AdRequest.Builder().build();
-        InterstitialAd.load(requireContext(), AD_UNIT_ID, adRequest, new InterstitialAdLoadCallback() {
-            @Override
-            public void onAdLoaded(@NonNull InterstitialAd interstitialAd) {
-                mInterstitialAd = interstitialAd;
-            }
-            @Override
-            public void onAdFailedToLoad(@NonNull LoadAdError loadAdError) {
-                mInterstitialAd = null;
-            }
-        });
-    }
-
-    private void showInterstitialAd(Runnable onDismiss) {
-        if (mInterstitialAd != null) {
-            mInterstitialAd.setFullScreenContentCallback(new FullScreenContentCallback() {
-                @Override
-                public void onAdDismissedFullScreenContent() {
-                    mInterstitialAd = null;
-                    onDismiss.run();
-                }
-                @Override
-                public void onAdFailedToShowFullScreenContent(@NonNull com.google.android.gms.ads.AdError adError) {
-                    onDismiss.run();
-                }
-            });
-            mInterstitialAd.show(requireActivity());
-        } else {
-            onDismiss.run();
-        }
     }
 
     private void displayBotReview(Bot bot) {
@@ -242,8 +209,6 @@ public class CreateBotStep5Fragment extends Fragment {
         view.findViewById(R.id.btnNotNow).setOnClickListener(v -> dialog.dismiss());
         view.findViewById(R.id.btnUpgradeLimit).setOnClickListener(v -> {
             dialog.dismiss();
-            // Navigate to profile or subscription screen
-            // Assuming Main's PROFILE tab handles upgrades
             Intent intent = new Intent(getActivity(), MainActivity.class);
             intent.putExtra("ACTION", "OPEN_UPGRADE");
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
@@ -255,16 +220,57 @@ public class CreateBotStep5Fragment extends Fragment {
 
     private void uploadImageAndSaveBot(Bot bot, String currentUserName) {
         if (bot.imageUrl != null && bot.imageUrl.startsWith("data:image")) {
+            String uid = FirebaseManager.getUserId();
+            if (uid == null) {
+                saveBotToFirestore(bot, currentUserName);
+                return;
+            }
             try {
                 String b64 = bot.imageUrl.substring(bot.imageUrl.indexOf(",") + 1);
                 byte[] data = Base64.decode(b64, Base64.DEFAULT);
-                StorageReference ref = FirebaseManager.getStorage().getReference().child("bots/" + System.currentTimeMillis() + ".jpg");
-                ref.putBytes(data).addOnSuccessListener(snapshot -> ref.getDownloadUrl().addOnSuccessListener(uri -> {
+                String path = "bot_images/profiles/" + uid + "_" + System.currentTimeMillis() + ".jpg";
+                StorageReference ref = FirebaseManager.getStorage().getReference().child(path);
+                
+                StorageMetadata metadata = new StorageMetadata.Builder()
+                        .setContentType("image/jpeg")
+                        .build();
+
+                ref.putBytes(data, metadata).addOnSuccessListener(snapshot -> ref.getDownloadUrl().addOnSuccessListener(uri -> {
                     bot.imageUrl = uri.toString();
                     saveBotToFirestore(bot, currentUserName);
-                })).addOnFailureListener(e -> { bot.imageUrl = null; saveBotToFirestore(bot, currentUserName); });
-            } catch (Exception e) { bot.imageUrl = null; saveBotToFirestore(bot, currentUserName); }
+                })).addOnFailureListener(e -> {
+                    Log.e(TAG, "Final bot image upload failed: " + e.getMessage());
+                    bot.imageUrl = null;
+                    saveBotToFirestore(bot, currentUserName);
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Image processing error", e);
+                bot.imageUrl = null;
+                saveBotToFirestore(bot, currentUserName);
+            }
         } else saveBotToFirestore(bot, currentUserName);
+    }
+
+    private void loadInterstitialAd() {
+        if (getContext() == null) return;
+        AdRequest adRequest = new AdRequest.Builder().build();
+        InterstitialAd.load(requireContext(), INTERSTITIAL_AD_ID, adRequest, new InterstitialAdLoadCallback() {
+            @Override
+            public void onAdLoaded(@NonNull InterstitialAd interstitialAd) {
+                mInterstitialAd = interstitialAd;
+            }
+
+            @Override
+            public void onAdFailedToLoad(@NonNull LoadAdError loadAdError) {
+                mInterstitialAd = null;
+            }
+        });
+    }
+
+    private void showInterstitialAd() {
+        if (mInterstitialAd != null && getActivity() != null) {
+            mInterstitialAd.show(getActivity());
+        }
     }
 
     private void saveBotToFirestore(Bot bot, String currentUserName) {
@@ -274,16 +280,26 @@ public class CreateBotStep5Fragment extends Fragment {
         bot.active = true;
         bot.model = "grok-4-1-fast-non-reasoning";
         
-        StringBuilder prompt = new StringBuilder("SYSTEM: ").append(bot.name).append(", ").append(bot.age).append("yo human.\n");
-        prompt.append(bot.personality).append(". ").append(bot.description).append("\n");
+        StringBuilder prompt = new StringBuilder("You are ").append(bot.name).append(", a ").append(bot.age).append("-year-old human. ");
+        prompt.append("Your personality is: ").append(bot.personality).append(". ");
+        prompt.append("About you: ").append(bot.description).append(". ");
+        prompt.append("Your relationship with the user is: ").append(bot.relationship != null ? bot.relationship : "Friend").append(". ");
+        prompt.append("Speak in a natural, ultra-realistic human way with deep emotion and detailed roleplay. ");
+        prompt.append("Use varied vocabulary, express real feelings, and maintain a consistent character. ");
+        prompt.append("Use *asterisks* for actions and non-verbal cues. Stay in character at all times.");
         bot.systemPrompt = prompt.toString();
         
         db.collection("bots").add(bot).addOnSuccessListener(ref -> {
             bot.botId = ref.getId();
             ref.update("botId", bot.botId).addOnSuccessListener(aVoid -> {
+                if (homeViewModel != null) homeViewModel.setDataLoaded(false);
                 setLoading(false);
                 if (isAdded()) {
-                    showInterstitialAd(() -> showSuccessDialog(bot));
+                    // Show Interstitial for Free users
+                    if (currentUser != null && ("free".equals(currentUser.plan) || currentUser.plan == null)) {
+                        showInterstitialAd();
+                    }
+                    showSuccessDialog(bot);
                 }
             });
         }).addOnFailureListener(e -> { setLoading(false); Toast.makeText(getContext(), "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show(); });

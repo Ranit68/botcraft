@@ -41,7 +41,11 @@ public class Bot implements Serializable {
         return (description != null) ? description : "Digital companion";
     }
     public void sanitizeForIntent() {
-        if (imageUrl != null && imageUrl.length() > 5000) imageUrl = null;
-        if (chatBackgroundUrl != null && chatBackgroundUrl.length() > 5000) chatBackgroundUrl = null;
+        // Prevents TransactionTooLargeException by clearing/truncating large fields before Intent
+        if (systemPrompt != null && systemPrompt.length() > 500) systemPrompt = systemPrompt.substring(0, 500);
+        if (description != null && description.length() > 500) description = description.substring(0, 500);
+        if (personality != null && personality.length() > 500) personality = personality.substring(0, 500);
+        if (imageUrl != null && imageUrl.length() > 2000) imageUrl = null;
+        if (chatBackgroundUrl != null && chatBackgroundUrl.length() > 2000) chatBackgroundUrl = null;
     }
 }

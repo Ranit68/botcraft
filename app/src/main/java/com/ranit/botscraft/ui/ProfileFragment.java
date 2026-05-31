@@ -30,6 +30,7 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatDelegate;
+import androidx.biometric.BiometricManager;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -85,8 +86,8 @@ public class ProfileFragment extends Fragment implements PurchasesUpdatedListene
     private ShapeableImageView imgProfile;
     private TextView tvUserName, tvUserEmail, tvPlanName, tvCreditsValue, tvBotsCount, tvChatsCount, tvImagesCount;
     private ProgressBar pbCredits;
-    private MaterialSwitch switchTheme, switchNotifications;
-    private View btnLogout, cvImagesCount, btnUpgrade, btnEditProfile, btnBlockedBots, btnAccountSettings, btnPrivacySecurity;
+    private MaterialSwitch switchTheme, switchNotifications, switchPinLock, switchBiometric;
+    private View btnLogout, cvImagesCount, cvBotsCount, btnUpgrade, btnEditProfile, btnBlockedBots, btnAccountSettings, btnPrivacySecurity, llBiometric;
     private FirebaseFirestore db;
     private String uid;
     private User currentUser;
@@ -161,8 +162,13 @@ public class ProfileFragment extends Fragment implements PurchasesUpdatedListene
         pbCredits = view.findViewById(R.id.pbCredits);
         switchTheme = view.findViewById(R.id.switchTheme);
         switchNotifications = view.findViewById(R.id.switchNotifications);
+        switchPinLock = view.findViewById(R.id.switchPinLock);
+        switchBiometric = view.findViewById(R.id.switchBiometric);
+        llBiometric = view.findViewById(R.id.llBiometric);
+        checkBiometricSupport();
         btnLogout = view.findViewById(R.id.btnLogout);
         cvImagesCount = view.findViewById(R.id.cvImagesCount);
+        cvBotsCount = view.findViewById(R.id.cvBotsCount);
         btnUpgrade = view.findViewById(R.id.btnUpgrade);
         btnEditProfile = view.findViewById(R.id.btnEditProfile);
         btnBlockedBots = view.findViewById(R.id.btnBlockedBots);
@@ -187,6 +193,26 @@ public class ProfileFragment extends Fragment implements PurchasesUpdatedListene
             }
         });
 
+        if (switchPinLock != null) {
+            switchPinLock.setOnCheckedChangeListener((button, isChecked) -> {
+                if (currentUser == null) return;
+                if (isChecked && (currentUser.pinCode == null || currentUser.pinCode.isEmpty())) {
+                    showSetPinDialog();
+                } else {
+                    db.collection("users").document(uid).update("securityEnabled", isChecked);
+                    saveSecurityPreference(isChecked);
+                }
+            });
+        }
+
+        if (switchBiometric != null) {
+            switchBiometric.setOnCheckedChangeListener((button, isChecked) -> {
+                if (uid != null) {
+                    db.collection("users").document(uid).update("biometricEnabled", isChecked);
+                }
+            });
+        }
+
         btnLogout.setOnClickListener(v -> {
             FirebaseAuth.getInstance().signOut();
             Intent intent = new Intent(getActivity(), LoginActivity.class);
@@ -195,6 +221,7 @@ public class ProfileFragment extends Fragment implements PurchasesUpdatedListene
         });
 
         cvImagesCount.setOnClickListener(v -> openImageViewer());
+        if (cvBotsCount != null) cvBotsCount.setOnClickListener(v -> showCreatedBotsBottomSheet());
         if (btnUpgrade != null) btnUpgrade.setOnClickListener(v -> showUpgradeDialog());
         if (btnEditProfile != null) btnEditProfile.setOnClickListener(v -> showEditProfileDialog());
         if (btnBlockedBots != null) btnBlockedBots.setOnClickListener(v -> showBlockedBotsBottomSheet());
@@ -217,6 +244,9 @@ public class ProfileFragment extends Fragment implements PurchasesUpdatedListene
         View btnPremium = upgradeDialog.findViewById(R.id.btnPlanPremium);
         View btnUltra = upgradeDialog.findViewById(R.id.btnPlanUltra);
         
+        RadioButton rbPremium = upgradeDialog.findViewById(R.id.rbPremium);
+        RadioButton rbUltra = upgradeDialog.findViewById(R.id.rbUltra);
+        
         TextView tvFreeBadge = upgradeDialog.findViewById(R.id.tvFreeBadge);
         TextView tvPremiumBadge = upgradeDialog.findViewById(R.id.tvPremiumBadge);
         TextView tvUltraBadge = upgradeDialog.findViewById(R.id.tvUltraBadge);
@@ -237,12 +267,16 @@ public class ProfileFragment extends Fragment implements PurchasesUpdatedListene
             selectedPlan[0] = PLAN_PREMIUM;
             btnPremium.setBackgroundResource(R.drawable.bg_plan_selected);
             btnUltra.setBackgroundResource(R.drawable.bg_plan_unselected);
+            if (rbPremium != null) rbPremium.setChecked(true);
+            if (rbUltra != null) rbUltra.setChecked(false);
         });
 
         btnUltra.setOnClickListener(v -> {
             selectedPlan[0] = PLAN_ULTRA;
             btnUltra.setBackgroundResource(R.drawable.bg_plan_selected);
             btnPremium.setBackgroundResource(R.drawable.bg_plan_unselected);
+            if (rbUltra != null) rbUltra.setChecked(true);
+            if (rbPremium != null) rbPremium.setChecked(false);
         });
 
         btnClose.setOnClickListener(v -> upgradeDialog.dismiss());
@@ -304,10 +338,10 @@ public class ProfileFragment extends Fragment implements PurchasesUpdatedListene
 
         user.getIdToken(true).addOnSuccessListener(result -> {
             String token = "Bearer " + result.getToken();
-            PurchaseVerificationRequest request = new PurchaseVerificationRequest(
-                    purchase.getPurchaseToken(),
-                    purchase.getProducts().get(0)
-            );
+            String productId = purchase.getProducts().get(0);
+            Log.d(TAG, "Verifying Subscription: " + productId);
+
+            PurchaseVerificationRequest request = new PurchaseVerificationRequest(purchase.getPurchaseToken(), productId);
 
             RetrofitClient.getService().verifyPurchase(token, request).enqueue(new Callback<PurchaseVerificationResponse>() {
                 @Override
@@ -316,13 +350,22 @@ public class ProfileFragment extends Fragment implements PurchasesUpdatedListene
                         Toast.makeText(getContext(), "Upgrade Successful!", Toast.LENGTH_LONG).show();
                         if (upgradeDialog != null) upgradeDialog.dismiss();
                         
-                        // NEW: Acknowledge the subscription to prevent automatic refund
                         if (!purchase.isAcknowledged()) {
                             acknowledgeSubscription(purchase);
                         }
+                    } else {
+                        String errorMsg = "Verification failed";
+                        try {
+                            if (response.errorBody() != null) errorMsg = response.errorBody().string();
+                        } catch (Exception ignored) {}
+                        Log.e(TAG, "Server error: " + errorMsg);
+                        Toast.makeText(getContext(), "Upgrade Failed: " + errorMsg, Toast.LENGTH_LONG).show();
                     }
                 }
-                @Override public void onFailure(Call<PurchaseVerificationResponse> call, Throwable t) {}
+                @Override public void onFailure(Call<PurchaseVerificationResponse> call, Throwable t) {
+                    Log.e(TAG, "Network failure", t);
+                    Toast.makeText(getContext(), "Network Error: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+                }
             });
         });
     }
@@ -359,6 +402,13 @@ public class ProfileFragment extends Fragment implements PurchasesUpdatedListene
                     tvCreditsValue.setText(currentUser.credits + " available");
                     pbCredits.setProgress(currentUser.credits);
                     switchNotifications.setChecked(currentUser.notificationsEnabled);
+                    
+                    if (switchPinLock != null) {
+                        switchPinLock.setChecked(currentUser.securityEnabled);
+                    }
+                    if (switchBiometric != null) {
+                        switchBiometric.setChecked(currentUser.biometricEnabled);
+                    }
                 }
             }
         });
@@ -508,55 +558,247 @@ public class ProfileFragment extends Fragment implements PurchasesUpdatedListene
         dialog.show();
     }
 
+    private void showCreatedBotsBottomSheet() {
+        if (uid == null) return;
+        
+        BottomSheetDialog dialog = new BottomSheetDialog(requireContext(), R.style.Theme_Chstbot_Dialog);
+        View view = LayoutInflater.from(getContext()).inflate(R.layout.dialog_voice_list, null);
+        dialog.setContentView(view);
+        
+        TextView tvTitle = view.findViewById(R.id.tvTitle);
+        if (tvTitle != null) tvTitle.setText("My AI Companions");
+
+        RecyclerView rv = view.findViewById(R.id.rvVoices);
+        rv.setLayoutManager(new LinearLayoutManager(getContext()));
+        
+        List<Bot> myBots = new ArrayList<>();
+        CreatedBotAdapter adapter = new CreatedBotAdapter(myBots, bot -> {
+            dialog.dismiss();
+            bot.sanitizeForIntent();
+            Intent intent = new Intent(getActivity(), BotProfileActivity.class);
+            intent.putExtra("bot", bot);
+            startActivity(intent);
+        });
+        rv.setAdapter(adapter);
+
+        db.collection("bots").whereEqualTo("ownerId", uid).get().addOnSuccessListener(snap -> {
+            if (snap != null && !snap.isEmpty()) {
+                for (com.google.firebase.firestore.DocumentSnapshot doc : snap.getDocuments()) {
+                    Bot b = doc.toObject(Bot.class);
+                    if (b != null) {
+                        b.botId = doc.getId();
+                        myBots.add(b);
+                    }
+                }
+                adapter.notifyDataSetChanged();
+            } else {
+                Toast.makeText(getContext(), "You haven't created any bots yet", Toast.LENGTH_SHORT).show();
+                dialog.dismiss();
+            }
+        });
+        
+        dialog.show();
+    }
+
+    private static class CreatedBotAdapter extends RecyclerView.Adapter<CreatedBotAdapter.VH> {
+        private final List<Bot> list;
+        private final OnBotClickListener listener;
+
+        interface OnBotClickListener { void onBotClick(Bot bot); }
+
+        CreatedBotAdapter(List<Bot> list, OnBotClickListener listener) {
+            this.list = list;
+            this.listener = listener;
+        }
+
+        @NonNull
+        @Override
+        public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            return new VH(LayoutInflater.from(parent.getContext()).inflate(R.layout.item_my_bot, parent, false));
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull VH holder, int position) {
+            Bot bot = list.get(position);
+            holder.tvName.setText(bot.name);
+            holder.tvDetails.setText(bot.relationship + " • " + bot.age + "y");
+            
+            if (bot.imageUrl != null && !bot.imageUrl.isEmpty()) {
+                Glide.with(holder.itemView.getContext()).load(bot.imageUrl).circleCrop().into(holder.img);
+            } else {
+                holder.img.setImageResource(R.drawable.user);
+            }
+
+            holder.itemView.setOnClickListener(v -> listener.onBotClick(bot));
+        }
+
+        @Override public int getItemCount() { return list.size(); }
+
+        static class VH extends RecyclerView.ViewHolder {
+            ImageView img;
+            TextView tvName, tvDetails;
+            VH(View v) {
+                super(v);
+                img = v.findViewById(R.id.imgMyBot);
+                tvName = v.findViewById(R.id.tvMyBotName);
+                tvDetails = v.findViewById(R.id.tvMyBotDetails);
+            }
+        }
+    }
+
     private void showEditProfileDialog() {
         if (currentUser == null) return;
         Dialog dialog = new Dialog(requireContext());
         dialog.setContentView(R.layout.dialog_edit_profile);
-        if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
 
         dialogProfileImage = dialog.findViewById(R.id.imgEditProfile);
         EditText etName = dialog.findViewById(R.id.etEditName);
         RadioGroup rgGender = dialog.findViewById(R.id.rgGender);
+        RadioButton rbMale = dialog.findViewById(R.id.rbMale);
+        RadioButton rbFemale = dialog.findViewById(R.id.rbFemale);
+        RadioButton rbOther = dialog.findViewById(R.id.rbOther);
         MaterialButton btnSave = dialog.findViewById(R.id.btnSaveProfile);
 
         etName.setText(currentUser.name);
-        if (currentUser.imageUrl != null) Glide.with(this).load(currentUser.imageUrl).circleCrop().into(dialogProfileImage);
+
+        // Pre-select gender from DB
+        if (currentUser.gender != null) {
+            if (currentUser.gender.equalsIgnoreCase("Male")) rbMale.setChecked(true);
+            else if (currentUser.gender.equalsIgnoreCase("Female")) rbFemale.setChecked(true);
+            else if (currentUser.gender.equalsIgnoreCase("Other")) rbOther.setChecked(true);
+        }
+
+        if (currentUser.imageUrl != null && !currentUser.imageUrl.isEmpty()) {
+            Glide.with(this).load(currentUser.imageUrl).circleCrop().into(dialogProfileImage);
+        }
         
         dialogProfileImage.setOnClickListener(v -> imagePickerLauncher.launch(new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)));
         
         btnSave.setOnClickListener(v -> {
             String name = etName.getText().toString().trim();
-            if (selectedImageUri != null) uploadProfileImage(selectedImageUri, name, dialog);
-            else updateProfileData(name, null, dialog);
+            if (name.isEmpty()) {
+                etName.setError("Name cannot be empty");
+                return;
+            }
+
+            String gender = "Other";
+            int checkedId = rgGender.getCheckedRadioButtonId();
+            if (checkedId == R.id.rbMale) gender = "Male";
+            else if (checkedId == R.id.rbFemale) gender = "Female";
+
+            if (selectedImageUri != null) uploadProfileImage(selectedImageUri, name, gender, dialog);
+            else updateProfileData(name, gender, null, dialog);
         });
         dialog.show();
     }
 
-    private void uploadProfileImage(Uri uri, String name, Dialog dialog) {
+    private void uploadProfileImage(Uri uri, String name, String gender, Dialog dialog) {
         StorageReference ref = FirebaseManager.getStorage().getReference().child("profiles/" + uid + ".jpg");
-        ref.putFile(uri).addOnSuccessListener(ts -> ref.getDownloadUrl().addOnSuccessListener(dUri -> updateProfileData(name, dUri.toString(), dialog)));
+        ref.putFile(uri).addOnSuccessListener(ts -> ref.getDownloadUrl().addOnSuccessListener(dUri -> updateProfileData(name, gender, dUri.toString(), dialog)));
     }
 
-    private void updateProfileData(String name, @Nullable String imageUrl, Dialog dialog) {
+    private void updateProfileData(String name, String gender, @Nullable String imageUrl, Dialog dialog) {
         Map<String, Object> updates = new HashMap<>();
         updates.put("name", name);
+        updates.put("gender", gender);
         if (imageUrl != null) updates.put("imageUrl", imageUrl);
-        db.collection("users").document(uid).update(updates).addOnSuccessListener(aVoid -> dialog.dismiss());
+        db.collection("users").document(uid).update(updates).addOnSuccessListener(aVoid -> {
+            Toast.makeText(getContext(), "Profile updated", Toast.LENGTH_SHORT).show();
+            dialog.dismiss();
+        });
+    }
+
+    private void showSetPinDialog() {
+        Dialog dialog = new Dialog(requireContext());
+        dialog.setContentView(R.layout.dialog_edit_profile); // Reusing layout for simplicity or create new
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+
+        // Custom PIN dialog would be better, but let's use a quick one
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle("Set Security PIN");
+        
+        final EditText input = new EditText(requireContext());
+        input.setHint("4-digit PIN");
+        input.setGravity(android.view.Gravity.CENTER);
+        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+        input.setFilters(new android.text.InputFilter[] { new android.text.InputFilter.LengthFilter(4) });
+        input.setLetterSpacing(0.5f);
+        builder.setView(input);
+
+        builder.setPositiveButton("Set", (d, w) -> {
+            String pin = input.getText().toString().trim();
+            if (pin.length() == 4) {
+                db.collection("users").document(uid).update(
+                    "pinCode", pin,
+                    "securityEnabled", true
+                ).addOnSuccessListener(aVoid -> {
+                    Toast.makeText(getContext(), "PIN Set Successfully", Toast.LENGTH_SHORT).show();
+                    saveSecurityPreference(true);
+                });
+            } else {
+                Toast.makeText(getContext(), "PIN too short", Toast.LENGTH_SHORT).show();
+                switchPinLock.setChecked(false);
+            }
+        });
+        builder.setNegativeButton("Cancel", (d, w) -> switchPinLock.setChecked(false));
+        builder.setCancelable(false);
+        builder.show();
     }
 
     private void openImageViewer() {
         if (uid == null) return;
-        db.collection("usage").whereEqualTo("userId", uid).whereEqualTo("type", "image").get().addOnSuccessListener(snap -> {
-            ArrayList<String> urls = new ArrayList<>();
-            snap.getDocuments().forEach(doc -> {
-                String url = doc.getString("imageBase64");
-                if (url != null) urls.add(url);
-            });
-            if (!urls.isEmpty()) {
-                ImageDataHolder.setImages(urls);
-                startActivity(new Intent(getActivity(), ImageViewerActivity.class));
-            }
-        });
+        db.collection("usage")
+                .whereEqualTo("userId", uid)
+                .whereEqualTo("type", "image")
+                .get()
+                .addOnSuccessListener(snap -> {
+                    List<com.google.firebase.firestore.DocumentSnapshot> docs = new ArrayList<>(snap.getDocuments());
+                    
+                    // Sort by timestamp descending (latest first)
+                    java.util.Collections.sort(docs, (d1, d2) -> {
+                        com.google.firebase.Timestamp t1 = d1.getTimestamp("timestamp");
+                        com.google.firebase.Timestamp t2 = d2.getTimestamp("timestamp");
+                        if (t1 == null) return 1;
+                        if (t2 == null) return -1;
+                        return t2.compareTo(t1);
+                    });
+
+                    ArrayList<String> urls = new ArrayList<>();
+                    for (com.google.firebase.firestore.DocumentSnapshot doc : docs) {
+                        String url = doc.getString("imageBase64");
+                        if (url != null) urls.add(url);
+                    }
+                    
+                    if (!urls.isEmpty()) {
+                        ImageDataHolder.setImages(urls);
+                        startActivity(new Intent(getActivity(), ImageViewerActivity.class));
+                    } else {
+                        Toast.makeText(getContext(), "No generated images found", Toast.LENGTH_SHORT).show();
+                    }
+                });
+    }
+
+    private void saveSecurityPreference(boolean enabled) {
+        if (getContext() == null) return;
+        android.content.SharedPreferences prefs = getContext().getSharedPreferences("app_security", android.content.Context.MODE_PRIVATE);
+        prefs.edit().putBoolean("security_enabled", enabled).apply();
+    }
+
+    private void checkBiometricSupport() {
+        if (getContext() == null) return;
+        BiometricManager biometricManager = BiometricManager.from(requireContext());
+        int canAuthenticate = biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG | BiometricManager.Authenticators.DEVICE_CREDENTIAL);
+        
+        if (canAuthenticate != BiometricManager.BIOMETRIC_SUCCESS) {
+            if (llBiometric != null) llBiometric.setVisibility(View.GONE);
+        }
     }
 
     @Override

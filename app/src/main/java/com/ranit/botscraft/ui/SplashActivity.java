@@ -11,7 +11,6 @@ import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.ranit.botscraft.R;
-import com.google.android.gms.ads.MobileAds;
 import com.google.firebase.auth.FirebaseAuth;
 
 public class SplashActivity extends AppCompatActivity {
@@ -39,21 +38,25 @@ public class SplashActivity extends AppCompatActivity {
             animationDrawable.start();
         }
 
-        // Initialize Mobile Ads SDK
-        new Thread(() -> {
-            MobileAds.initialize(this, initializationStatus -> {});
-        }).start();
-
         // Increased delay slightly to show off the animation
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             if (FirebaseAuth.getInstance().getCurrentUser() == null){
                 startActivity(new Intent(SplashActivity.this, LoginActivity.class));
             } else {
-                startActivity(new Intent(SplashActivity.this, MainActivity.class));
+                if (isSecurityEnabled()) {
+                    startActivity(new Intent(SplashActivity.this, SecurityActivity.class));
+                } else {
+                    startActivity(new Intent(SplashActivity.this, MainActivity.class));
+                }
             }
             finish();
             // Standard transition
             overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
         }, 3500);
+    }
+
+    private boolean isSecurityEnabled() {
+        android.content.SharedPreferences prefs = getSharedPreferences("app_security", MODE_PRIVATE);
+        return prefs.getBoolean("security_enabled", false);
     }
 }

@@ -21,14 +21,22 @@ import java.util.List;
 
 public class FeaturedBotAdapter extends RecyclerView.Adapter<FeaturedBotAdapter.ViewHolder> {
 
-    private final List<Bot> bots;
+    private List<Bot> bots;
+    private final OnBotClickListener listener;
 
     public FeaturedBotAdapter(List<Bot> bots, OnBotClickListener listener) {
         this.bots = bots;
+        this.listener = listener;
+    }
+
+    public void updateData(List<Bot> newBots) {
+        this.bots = newBots;
+        notifyDataSetChanged();
     }
 
     public interface OnBotClickListener {
-        void onBotClick(Bot bot);
+        void onChatClick(Bot bot);
+        void onProfileClick(Bot bot);
     }
 
     @NonNull
@@ -53,18 +61,18 @@ public class FeaturedBotAdapter extends RecyclerView.Adapter<FeaturedBotAdapter.
                     .into(holder.imgBot);
         }
 
-        // Image click -> Redirect to Chat
+        // Image click -> Chat
         holder.imgBot.setOnClickListener(v -> {
-            Intent intent = new Intent(context, ChatActivity.class);
-            intent.putExtra("bot", bot);
-            context.startActivity(intent);
+            if (listener != null) listener.onChatClick(bot);
         });
 
-        // Name click -> Redirect to Profile
+        // Name click -> Profile
         holder.tvName.setOnClickListener(v -> {
-            Intent intent = new Intent(context, BotProfileActivity.class);
-            intent.putExtra("bot", bot);
-            context.startActivity(intent);
+            if (listener != null) listener.onProfileClick(bot);
+        });
+        
+        holder.itemView.setOnClickListener(v -> {
+            if (listener != null) listener.onChatClick(bot);
         });
     }
 

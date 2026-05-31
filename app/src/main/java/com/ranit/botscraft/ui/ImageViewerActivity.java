@@ -13,8 +13,10 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.viewpager2.widget.ViewPager2;
 
 import com.bumptech.glide.Glide;
+import com.github.chrisbanes.photoview.PhotoView;
 import com.ranit.botscraft.R;
 import com.ranit.botscraft.util.ImageDataHolder;
 
@@ -24,11 +26,12 @@ import java.util.List;
 public class ImageViewerActivity extends AppCompatActivity {
 
     private static final String TAG = "ImageViewerActivity";
-    private ImageView imgMain;
+    private ViewPager2 viewPager;
     private RecyclerView rvThumbs;
     private TextView tvCounter;
     private List<String> imageUrls = new ArrayList<>();
     private int selectedPosition = 0;
+    private ThumbAdapter thumbAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -36,72 +39,100 @@ public class ImageViewerActivity extends AppCompatActivity {
         setContentView(R.layout.activity_image_viewer);
 
         try {
-            // Use DataHolder to get images
             List<String> heldImages = ImageDataHolder.getImages();
-            
             if (heldImages == null || heldImages.isEmpty()) {
-                Log.e(TAG, "No images found in DataHolder");
                 finish();
                 return;
             }
 
-            // Copy to local list to survive small lifecycle events without immediate clearing
             imageUrls.addAll(heldImages);
 
-            imgMain = findViewById(R.id.imgMain);
+            viewPager = findViewById(R.id.viewPager);
             rvThumbs = findViewById(R.id.rvThumbs);
             tvCounter = findViewById(R.id.tvCounter);
             
             View btnBack = findViewById(R.id.btnBack);
-            if (btnBack != null) {
-                btnBack.setOnClickListener(v -> finish());
-            }
+            if (btnBack != null) btnBack.setOnClickListener(v -> finish());
 
-            setupMainImage(0);
+            setupViewPager();
             setupRecyclerView();
+            
+            updateCounter(0);
         } catch (Exception e) {
             Log.e(TAG, "Error in onCreate", e);
             finish();
         }
     }
 
-    private void setupMainImage(int position) {
-        if (imageUrls == null || imageUrls.isEmpty() || position >= imageUrls.size()) return;
-        
-        selectedPosition = position;
-        tvCounter.setText((position + 1) + " / " + imageUrls.size());
-        String data = imageUrls.get(position);
-
-        try {
-            if (data.startsWith("http") || data.startsWith("https")) {
-                Glide.with(this).load(data).into(imgMain);
-            } else {
-                // Handle Base64 (data:image/png;base64,...)
-                String cleanBase64 = data;
-                if (data.contains(",")) {
-                    cleanBase64 = data.split(",")[1];
+    private void setupViewPager() {
+        ImagePagerAdapter adapter = new ImagePagerAdapter(imageUrls);
+        viewPager.setAdapter(adapter);
+        viewPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
+            @Override
+            public void onPageSelected(int position) {
+                int old = selectedPosition;
+                selectedPosition = position;
+                updateCounter(position);
+                
+                if (thumbAdapter != null) {
+                    thumbAdapter.notifyItemChanged(old);
+                    thumbAdapter.notifyItemChanged(selectedPosition);
+                    rvThumbs.smoothScrollToPosition(position);
                 }
-                byte[] bytes = Base64.decode(cleanBase64, Base64.DEFAULT);
-                Glide.with(this).load(bytes).into(imgMain);
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Glide error loading main image", e);
-            imgMain.setImageResource(R.drawable.ic_launcher_background);
-        }
+        });
     }
 
     private void setupRecyclerView() {
-        ThumbAdapter adapter = new ThumbAdapter(imageUrls);
-        rvThumbs.setAdapter(adapter);
+        thumbAdapter = new ThumbAdapter(imageUrls);
+        rvThumbs.setAdapter(thumbAdapter);
         rvThumbs.setLayoutManager(new LinearLayoutManager(this, RecyclerView.HORIZONTAL, false));
+    }
+
+    private void updateCounter(int position) {
+        tvCounter.setText((position + 1) + " / " + imageUrls.size());
+    }
+
+    private class ImagePagerAdapter extends RecyclerView.Adapter<ImagePagerAdapter.VH> {
+        private final List<String> list;
+
+        ImagePagerAdapter(List<String> list) { this.list = list; }
+
+        @NonNull
+        @Override
+        public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            PhotoView photoView = new PhotoView(parent.getContext());
+            photoView.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            return new VH(photoView);
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull VH holder, int position) {
+            String data = list.get(position);
+            try {
+                if (data.startsWith("http")) Glide.with(holder.itemView).load(data).into(holder.photoView);
+                else {
+                    String clean = data.contains(",") ? data.split(",")[1] : data;
+                    byte[] bytes = Base64.decode(clean, Base64.DEFAULT);
+                    Glide.with(holder.itemView).load(bytes).into(holder.photoView);
+                }
+            } catch (Exception e) {
+                holder.photoView.setImageResource(R.drawable.ic_launcher_background);
+            }
+        }
+
+        @Override public int getItemCount() { return list.size(); }
+
+        class VH extends RecyclerView.ViewHolder {
+            PhotoView photoView;
+            VH(View v) { super(v); photoView = (PhotoView) v; }
+        }
     }
 
     private class ThumbAdapter extends RecyclerView.Adapter<ThumbAdapter.VH> {
         private final List<String> list;
 
-        ThumbAdapter(List<String> list) {
-            this.list = list;
-        }
+        ThumbAdapter(List<String> list) { this.list = list; }
 
         @NonNull
         @Override
@@ -112,46 +143,29 @@ public class ImageViewerActivity extends AppCompatActivity {
         @Override
         public void onBindViewHolder(@NonNull VH holder, int position) {
             String data = list.get(position);
-            
             try {
-                if (data.startsWith("http") || data.startsWith("https")) {
-                    Glide.with(holder.img.getContext()).load(data).centerCrop().into(holder.img);
-                } else {
-                    String cleanBase64 = data;
-                    if (data.contains(",")) {
-                        cleanBase64 = data.split(",")[1];
-                    }
-                    byte[] bytes = Base64.decode(cleanBase64, Base64.DEFAULT);
+                if (data.startsWith("http")) Glide.with(holder.img.getContext()).load(data).centerCrop().into(holder.img);
+                else {
+                    String clean = data.contains(",") ? data.split(",")[1] : data;
+                    byte[] bytes = Base64.decode(clean, Base64.DEFAULT);
                     Glide.with(holder.img.getContext()).load(bytes).centerCrop().into(holder.img);
                 }
-            } catch (Exception e) {
-                holder.img.setImageResource(R.drawable.ic_launcher_background);
-            }
+            } catch (Exception e) { holder.img.setImageResource(R.drawable.ic_launcher_background); }
 
             holder.border.setVisibility(position == selectedPosition ? View.VISIBLE : View.GONE);
             holder.overlay.setVisibility(position == selectedPosition ? View.GONE : View.VISIBLE);
             holder.txt.setVisibility(position == selectedPosition ? View.VISIBLE : View.GONE);
             holder.txt.setText(String.valueOf(position + 1));
 
-            holder.itemView.setOnClickListener(v -> {
-                int old = selectedPosition;
-                setupMainImage(position);
-                notifyItemChanged(old);
-                notifyItemChanged(selectedPosition);
-                rvThumbs.smoothScrollToPosition(position);
-            });
+            holder.itemView.setOnClickListener(v -> viewPager.setCurrentItem(position, true));
         }
 
-        @Override
-        public int getItemCount() {
-            return list != null ? list.size() : 0;
-        }
+        @Override public int getItemCount() { return list.size(); }
 
         class VH extends RecyclerView.ViewHolder {
             ImageView img;
             View border, overlay;
             TextView txt;
-
             VH(View v) {
                 super(v);
                 img = v.findViewById(R.id.imgThumbnail);
@@ -165,9 +179,6 @@ public class ImageViewerActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        // Clear data holder only when finishing to prevent data loss on rotation
-        if (isFinishing()) {
-            ImageDataHolder.setImages(null);
-        }
+        if (isFinishing()) ImageDataHolder.setImages(null);
     }
 }

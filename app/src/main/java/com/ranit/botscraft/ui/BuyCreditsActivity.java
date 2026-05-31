@@ -29,10 +29,13 @@ import com.ranit.botscraft.network.PurchaseVerificationResponse;
 import com.ranit.botscraft.network.RetrofitClient;
 import com.google.android.gms.ads.AdRequest;
 import com.google.android.gms.ads.LoadAdError;
+import com.google.android.gms.ads.OnUserEarnedRewardListener;
+import com.google.android.gms.ads.rewarded.RewardItem;
 import com.google.android.gms.ads.rewarded.RewardedAd;
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.ListenerRegistration;
 
 import java.util.List;
@@ -45,7 +48,6 @@ import retrofit2.Response;
 public class BuyCreditsActivity extends AppCompatActivity implements PurchasesUpdatedListener {
 
     private static final String TAG = "BuyCreditsActivity";
-    private static final String AD_UNIT_ID = "ca-app-pub-3940256099942544/5224354917";
 
     public static final String SKU_100 = "credits_100";
     public static final String SKU_360 = "credits_360";
@@ -56,9 +58,10 @@ public class BuyCreditsActivity extends AppCompatActivity implements PurchasesUp
     private TextView tvCurrentBalance;
     private View btnBuy49, btnBuy129, btnBuy249, btnBuy499, btnWatchAd;
     private ListenerRegistration userListener;
-    private RewardedAd rewardedAd;
-    private boolean isLoadingAd = false;
     private BillingClient billingClient;
+
+    private RewardedAd rewardedAd;
+    private final String REWARDED_AD_ID = "ca-app-pub-2446534560156295/7891496710";
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -70,6 +73,45 @@ public class BuyCreditsActivity extends AppCompatActivity implements PurchasesUp
         setupListeners();
         observeCredits();
         loadRewardedAd();
+    }
+
+    private void loadRewardedAd() {
+        AdRequest adRequest = new AdRequest.Builder().build();
+        RewardedAd.load(this, REWARDED_AD_ID, adRequest, new RewardedAdLoadCallback() {
+            @Override
+            public void onAdFailedToLoad(@NonNull LoadAdError loadAdError) {
+                rewardedAd = null;
+            }
+
+            @Override
+            public void onAdLoaded(@NonNull RewardedAd ad) {
+                rewardedAd = ad;
+            }
+        });
+    }
+
+    private void showRewardedAd() {
+        if (rewardedAd != null) {
+            rewardedAd.show(this, new OnUserEarnedRewardListener() {
+                @Override
+                public void onUserEarnedReward(@NonNull RewardItem rewardItem) {
+                    addRewardCredits(20);
+                    loadRewardedAd(); // Load next one
+                }
+            });
+        } else {
+            Toast.makeText(this, "Ad not ready yet. Please try again.", Toast.LENGTH_SHORT).show();
+            loadRewardedAd();
+        }
+    }
+
+    private void addRewardCredits(int amount) {
+        String uid = FirebaseManager.getUserId();
+        if (uid != null) {
+            FirebaseManager.getFirestore().collection("users").document(uid)
+                    .update("credits", FieldValue.increment(amount))
+                    .addOnSuccessListener(aVoid -> Toast.makeText(this, "Reward added: " + amount + " Credits", Toast.LENGTH_SHORT).show());
+        }
     }
 
     private void initViews() {
@@ -164,51 +206,6 @@ public class BuyCreditsActivity extends AppCompatActivity implements PurchasesUp
 
     private void consume(Purchase purchase) {
         billingClient.consumeAsync(ConsumeParams.newBuilder().setPurchaseToken(purchase.getPurchaseToken()).build(), (res, token) -> {});
-    }
-
-    private void loadRewardedAd() {
-        if (isLoadingAd || rewardedAd != null) return;
-        isLoadingAd = true;
-        AdRequest adRequest = new AdRequest.Builder().build();
-        RewardedAd.load(this, AD_UNIT_ID, adRequest, new RewardedAdLoadCallback() {
-            @Override
-            public void onAdFailedToLoad(@NonNull LoadAdError loadAdError) {
-                isLoadingAd = false;
-                rewardedAd = null;
-                Log.e(TAG, "Ad failed to load: " + loadAdError.getMessage());
-            }
-
-            @Override
-            public void onAdLoaded(@NonNull RewardedAd ad) {
-                isLoadingAd = false;
-                rewardedAd = ad;
-                Log.d(TAG, "Ad loaded successfully");
-            }
-        });
-    }
-
-    private void showRewardedAd() {
-        if (rewardedAd != null) {
-            rewardedAd.show(this, rewardItem -> grantAdReward());
-            rewardedAd = null;
-            loadRewardedAd();
-        } else {
-            Toast.makeText(this, "Ad is still loading, please try again in a moment", Toast.LENGTH_SHORT).show();
-            loadRewardedAd();
-        }
-    }
-
-    private void grantAdReward() {
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) return;
-        user.getIdToken(true).addOnSuccessListener(result -> {
-            RetrofitClient.getService().rewardCredit("Bearer " + result.getToken()).enqueue(new Callback<ResponseBody>() {
-                @Override public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
-                    if (response.isSuccessful()) Toast.makeText(BuyCreditsActivity.this, "Earned +20 Credits!", Toast.LENGTH_SHORT).show();
-                }
-                @Override public void onFailure(Call<ResponseBody> call, Throwable t) {}
-            });
-        });
     }
 
     private void observeCredits() {

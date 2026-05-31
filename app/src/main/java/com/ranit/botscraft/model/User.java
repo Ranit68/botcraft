@@ -46,6 +46,11 @@ public class User implements Serializable {
     // Notification settings
     public boolean notificationsEnabled = true; // Default to true
 
+    // Security settings
+    public boolean securityEnabled = false;
+    public boolean biometricEnabled = false;
+    public String pinCode;
+
     public User() {
     }
 }

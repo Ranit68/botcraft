@@ -10,6 +10,9 @@ function getApiKey() {
   const key = process.env.ELEVEN_API_KEY;
 
   if (!key) {
+    console.error(
+        "ELEVEN_API_KEY is not defined in environment variables or secrets",
+    );
     throw new Error("Missing ELEVEN_API_KEY");
   }
 
@@ -33,7 +36,14 @@ function getHeaders() {
  * @return {*}
  */
 function getErrorData(error) {
-  return error.response ? error.response.data : error.message;
+  if (error.response) {
+    return {
+      status: error.response.status,
+      data: error.response.data,
+      headers: error.response.headers,
+    };
+  }
+  return error.message;
 }
 
 /**
@@ -42,49 +52,61 @@ function getErrorData(error) {
  * @param {string=} voiceId
  * @return {Promise<string>}
  */
-exports.textToSpeech = async (text, voiceId = "21m00Tcm4TlvDq8ikWAM") => {
+exports.textToSpeech = async (
+    text,
+    voiceId = "21m00Tcm4TlvDq8ikWAM",
+) => {
   try {
+    console.log(
+        `Generating TTS for text: "${text.substring(0, 20)}..." ` +
+        `using voice: ${voiceId}`,
+    );
+
+    const headers = getHeaders();
+    headers["accept"] = "audio/mpeg";
+
     const response = await axios.post(
         `${BASE_URL}/text-to-speech/${voiceId}`,
         {
           text,
           model_id: "eleven_multilingual_v2",
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.5,
+          },
         },
         {
-          headers: getHeaders(),
+          headers: headers,
           responseType: "arraybuffer",
         },
     );
 
     const base64Audio = Buffer.from(response.data).toString("base64");
-    return `data:audio/mpeg;base64,${base64Audio}`;
+    return base64Audio;
   } catch (error) {
-    console.error("ELEVEN TTS ERROR:", getErrorData(error));
-    throw new Error("Text-to-speech failed");
-  }
-};
+    const errorData = getErrorData(error);
+    console.error("ELEVEN TTS ERROR:", JSON.stringify(errorData));
 
-/**
- * Transcribes speech from a remote audio URL.
- * @param {string} audioUrl
- * @return {Promise<string>}
- */
-exports.speechToText = async (audioUrl) => {
-  try {
-    const response = await axios.post(
-        `${BASE_URL}/speech-to-text`,
-        {
-          audio_url: audioUrl,
-        },
-        {
-          headers: getHeaders(),
-        },
-    );
+    // If it's an arraybuffer, the error data might be a buffer too.
+    let message = "Text-to-speech failed";
+    if (error.response && error.response.data instanceof Buffer) {
+      try {
+        const errorJson = JSON.parse(error.response.data.toString());
+        message += ": " + (
+          errorJson.detail ?
+            errorJson.detail.message || errorJson.detail :
+            error.response.status
+        );
+      } catch (e) {
+        message += ": " + error.response.status;
+      }
+    } else {
+      message += ": " + (
+        error.response ? error.response.status : error.message
+      );
+    }
 
-    return response.data.text;
-  } catch (error) {
-    console.error("ELEVEN STT ERROR:", getErrorData(error));
-    throw new Error("Speech-to-text failed");
+    throw new Error(message);
   }
 };
 
@@ -94,39 +116,27 @@ exports.speechToText = async (audioUrl) => {
  */
 exports.getVoices = async () => {
   try {
+    console.log("Fetching voices from ElevenLabs...");
     const response = await axios.get(`${BASE_URL}/voices`, {
       headers: getHeaders(),
     });
 
+    if (!response.data || !response.data.voices) {
+      console.error(
+          "Unexpected response format from ElevenLabs:",
+          response.data,
+      );
+      throw new Error("Invalid response format from ElevenLabs");
+    }
+
     return response.data.voices;
   } catch (error) {
-    console.error("VOICE LIST ERROR:", getErrorData(error));
-    throw new Error("Failed to fetch voices");
-  }
-};
-
-/**
- * Converts one speech sample into another voice.
- * @param {string} audioBase64
- * @param {string} voiceId
- * @return {Promise<string>}
- */
-exports.speechToSpeech = async (audioBase64, voiceId) => {
-  try {
-    const response = await axios.post(
-        `${BASE_URL}/speech-to-speech/${voiceId}`,
-        {
-          audio: audioBase64,
-        },
-        {
-          headers: getHeaders(),
-          responseType: "arraybuffer",
-        },
+    const errorData = getErrorData(error);
+    console.error("VOICE LIST ERROR:", JSON.stringify(errorData));
+    throw new Error(
+        `Failed to fetch voices: ${
+          error.response ? error.response.status : error.message
+        }`,
     );
-
-    return Buffer.from(response.data).toString("base64");
-  } catch (error) {
-    console.error("VOICE CLONE ERROR:", getErrorData(error));
-    throw new Error("Speech-to-speech failed");
   }
 };

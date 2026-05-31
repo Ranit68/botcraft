@@ -51,7 +51,7 @@ public class ForgotPasswordActivity extends AppCompatActivity {
                     btnReset.setText("Send Reset Link");
                     if (task.isSuccessful()) {
                         Toast.makeText(ForgotPasswordActivity.this,
-                                "Reset link sent to your email", Toast.LENGTH_LONG).show();
+                                "Reset link sent to your email, please check spam folder", Toast.LENGTH_LONG).show();
                         finish();
                     } else {
                         Toast.makeText(ForgotPasswordActivity.this,

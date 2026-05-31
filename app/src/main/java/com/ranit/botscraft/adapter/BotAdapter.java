@@ -22,13 +22,16 @@ import java.util.List;
 public class BotAdapter extends RecyclerView.Adapter<BotAdapter.ViewHolder> {
 
     private final List<Bot> bots;
+    private final OnBotClickListener listener;
 
     public BotAdapter(List<Bot> bots, OnBotClickListener listener) {
         this.bots = bots;
+        this.listener = listener;
     }
 
     public interface OnBotClickListener {
-        void onBotClick(Bot bot);
+        void onChatClick(Bot bot);
+        void onProfileClick(Bot bot);
     }
 
     @NonNull
@@ -53,18 +56,19 @@ public class BotAdapter extends RecyclerView.Adapter<BotAdapter.ViewHolder> {
                     .into(holder.imgBot);
         }
 
-        // Image click -> Redirect to Chat
+        // Image click -> Chat
         holder.imgBot.setOnClickListener(v -> {
-            Intent intent = new Intent(context, ChatActivity.class);
-            intent.putExtra("bot", bot);
-            context.startActivity(intent);
+            if (listener != null) listener.onChatClick(bot);
         });
 
-        // Name click -> Redirect to Profile
+        // Name click -> Profile
         holder.tvName.setOnClickListener(v -> {
-            Intent intent = new Intent(context, BotProfileActivity.class);
-            intent.putExtra("bot", bot);
-            context.startActivity(intent);
+            if (listener != null) listener.onProfileClick(bot);
+        });
+        
+        // General click -> Chat
+        holder.itemView.setOnClickListener(v -> {
+            if (listener != null) listener.onChatClick(bot);
         });
     }
 

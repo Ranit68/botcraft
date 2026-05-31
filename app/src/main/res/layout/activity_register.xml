@@ -202,10 +202,14 @@
                     android:textSize="14sp" />
 
                 <ImageView
+                    android:id="@+id/ivPasswordToggle"
                     android:layout_width="20dp"
                     android:layout_height="20dp"
-                    android:src="@android:drawable/ic_menu_view"
-                    app:tint="@color/text_hint" />
+                    android:src="@drawable/ic_eye_hidden"
+                    app:tint="@color/text_hint"
+                    android:padding="2dp"
+                    android:clickable="true"
+                    android:focusable="true" />
             </LinearLayout>
 
             <!-- Confirm Password -->
@@ -240,15 +244,26 @@
 
                 <EditText
                     android:id="@+id/etConfirmPassword"
-                    android:layout_width="match_parent"
+                    android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_marginStart="12dp"
+                    android:layout_weight="1"
                     android:background="@null"
                     android:hint="Repeat your password"
                     android:inputType="textPassword"
                     android:textColor="@color/text_main"
                     android:textColorHint="@color/text_hint"
                     android:textSize="14sp" />
+
+                <ImageView
+                    android:id="@+id/ivConfirmPasswordToggle"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_eye_hidden"
+                    app:tint="@color/text_hint"
+                    android:padding="2dp"
+                    android:clickable="true"
+                    android:focusable="true" />
             </LinearLayout>
 
             <!-- Sign Up Button -->

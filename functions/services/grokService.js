@@ -1,6 +1,4 @@
 const axios = require("axios");
-const {xai} = require("@ai-sdk/xai");
-const {generateImage} = require("ai");
 
 const BASE_URL = "https://api.x.ai/v1";
 
@@ -52,37 +50,57 @@ function rethrowApiError(error) {
 
 /**
  * Sends a chat request to Grok.
- * @param {string} systemPrompt
- * @param {string} userMessage
+ * Supports both legacy systemPrompt/userMessage and full conversation
+ * history.
+ * @param {string|null} systemPrompt
+ * @param {string|null} userMessage
  * @param {string=} model
  * @param {number=} maxTokens
+ * @param {Array=} messageList - Full conversation array
  * @return {Promise<object>}
  */
-exports.callGrok = async (systemPrompt, userMessage, model, maxTokens) => {
+exports.callGrok = async (
+    systemPrompt,
+    userMessage,
+    model,
+    maxTokens,
+    messageList,
+) => {
   try {
-    if (!userMessage && !systemPrompt) {
-      throw new Error("Invalid message content");
-    }
-
-    // Restored the specific model you use: grok-4-1-fast-non-reasoning
     const targetModel = model || "grok-4-1-fast-non-reasoning";
 
-    console.log(`Calling Grok API with model: ${targetModel}`);
+    // Determine the messages array to send
+    let finalMessages = [];
+    if (Array.isArray(messageList) && messageList.length > 0) {
+      finalMessages = messageList;
+    } else {
+      if (!userMessage && !systemPrompt) {
+        throw new Error(
+            "Invalid message content: both message and prompt are missing",
+        );
+      }
+      finalMessages = [
+        {
+          role: "system",
+          content: systemPrompt || "You are a helpful assistant.",
+        },
+        {
+          role: "user",
+          content: userMessage || "Hello",
+        },
+      ];
+    }
+
+    console.log(
+        `Calling Grok API with model: ${targetModel}. ` +
+        `Message count: ${finalMessages.length}`,
+    );
 
     const response = await axios.post(
         `${BASE_URL}/chat/completions`,
         {
           model: targetModel,
-          messages: [
-            {
-              role: "system",
-              content: systemPrompt || "You are a helpful assistant.",
-            },
-            {
-              role: "user",
-              content: userMessage || "Hello",
-            },
-          ],
+          messages: finalMessages,
           max_tokens: maxTokens || 1000,
           temperature: 0.7,
         },
@@ -110,55 +128,69 @@ exports.callGrok = async (systemPrompt, userMessage, model, maxTokens) => {
 };
 
 /**
- * Generates an image with xAI SDK.
+ * Generates an image using xAI REST API directly.
  * @param {string} prompt
  * @return {Promise<string>}
  */
 exports.generateImageAI = async (prompt) => {
   try {
-    const apiKey = process.env.XAI_API_KEY;
+    const apiKey = process.env.XAI_API_KEY || process.env.GROK_API_KEY;
 
     if (!apiKey) {
-      throw new Error("XAI_API_KEY not found");
+      throw new Error("API Key (XAI_API_KEY or GROK_API_KEY) not found");
     }
 
-    const result = await generateImage({
-      model: xai.image("grok-imagine-image"),
-      prompt,
-      apiKey: apiKey,
-    });
+    console.log(
+        "Generating image with prompt:",
+        prompt.substring(0, 100) + "...",
+    );
 
-    if (!result || !result.image || !result.image.base64) {
-      throw new Error("Invalid image response");
+    const response = await axios.post(
+        "https://api.x.ai/v1/images/generations",
+        {
+          model: "grok-imagine-image-quality",
+          prompt: prompt,
+          n: 1,
+          response_format: "b64_json",
+        },
+        {
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          timeout: 110000,
+        },
+    );
+
+    if (
+      response.data &&
+      response.data.data &&
+      response.data.data[0] &&
+      response.data.data[0].b64_json
+    ) {
+      const b64 = response.data.data[0].b64_json;
+      return `data:image/png;base64,${b64}`;
     }
 
-    return `data:image/png;base64,${result.image.base64}`;
+    console.error(
+        "UNEXPECTED IMAGE API RESPONSE:",
+        JSON.stringify(response.data),
+    );
+    throw new Error("Invalid image response structure from xAI");
   } catch (error) {
-    console.error("IMAGE ERROR:", error);
-    throw new Error("Image generation failed");
+    if (axios.isAxiosError(error)) {
+      const details = error.response ? error.response.data : error.message;
+      console.error("IMAGE GENERATION API ERROR:", JSON.stringify(details));
+
+      let msg = "Image generation failed";
+      if (error.response && error.response.data && error.response.data.error) {
+        msg = error.response.data.error.message;
+      } else if (error.message) {
+        msg = error.message;
+      }
+      throw new Error(msg);
+    }
+    console.error("IMAGE GENERATION GENERIC ERROR:", error);
+    throw error;
   }
-};
-
-/**
- * Placeholder for video generation.
- * @return {Promise<never>}
- */
-exports.generateVideoAI = async () => {
-  throw new Error("Video generation not supported by xAI yet");
-};
-
-/**
- * Placeholder for text to speech.
- * @return {Promise<never>}
- */
-exports.textToSpeech = async () => {
-  throw new Error("Text-to-speech not supported by xAI API");
-};
-
-/**
- * Placeholder for speech to text.
- * @return {Promise<never>}
- */
-exports.speechToText = async () => {
-  throw new Error("Speech-to-text not supported by xAI API");
 };

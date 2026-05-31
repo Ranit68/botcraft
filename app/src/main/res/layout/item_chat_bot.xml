@@ -28,23 +28,68 @@
             android:fontFamily="@font/poppins_regular"
             android:textSize="15sp" />
 
-        <ImageView
-            android:id="@+id/ivContentImage"
-            android:layout_width="250dp"
-            android:layout_height="250dp"
-            android:layout_margin="4dp"
-            android:adjustViewBounds="true"
-            android:scaleType="centerCrop"
-            android:visibility="gone" />
-
-        <LinearLayout
+        <FrameLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="end"
+            android:layout_margin="4dp">
+
+            <ImageView
+                android:id="@+id/ivContentImage"
+                android:layout_width="250dp"
+                android:layout_height="250dp"
+                android:adjustViewBounds="true"
+                android:scaleType="centerCrop"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/llImageLockOverlay"
+                android:layout_width="250dp"
+                android:layout_height="250dp"
+                android:background="#DD000000"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <ImageView
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:src="@android:drawable/ic_lock_lock"
+                    app:tint="@android:color/white" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:fontFamily="@font/poppins_regular"
+                    android:text="Tap to Unlock"
+                    android:textColor="@android:color/white"
+                    android:textSize="14sp" />
+            </LinearLayout>
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingHorizontal="8dp"
             android:paddingBottom="4dp">
+
+            <ImageView
+                android:id="@+id/ivSpeak"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:padding="4dp"
+                android:src="@android:drawable/ic_lock_silent_mode_off"
+                app:tint="@color/accent_purple"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackgroundBorderless" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
 
             <TextView
                 android:id="@+id/tvTime"
