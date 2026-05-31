@@ -26,6 +26,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.PickVisualMediaRequest;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -98,12 +99,11 @@ public class ProfileFragment extends Fragment implements PurchasesUpdatedListene
     private Uri selectedImageUri;
     private ImageView dialogProfileImage;
 
-    private final ActivityResultLauncher<Intent> imagePickerLauncher = registerForActivityResult(
-            new ActivityResultContracts.StartActivityForResult(),
-            result -> {
-                if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
-                    Uri uri = result.getData().getData();
-                    if (dialogProfileImage != null && uri != null) {
+    private final ActivityResultLauncher<PickVisualMediaRequest> imagePickerLauncher = registerForActivityResult(
+            new ActivityResultContracts.PickVisualMedia(),
+            uri -> {
+                if (uri != null) {
+                    if (dialogProfileImage != null) {
                         Glide.with(this).load(uri).circleCrop().into(dialogProfileImage);
                         selectedImageUri = uri;
                     }
@@ -676,7 +676,9 @@ public class ProfileFragment extends Fragment implements PurchasesUpdatedListene
             Glide.with(this).load(currentUser.imageUrl).circleCrop().into(dialogProfileImage);
         }
         
-        dialogProfileImage.setOnClickListener(v -> imagePickerLauncher.launch(new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)));
+        dialogProfileImage.setOnClickListener(v -> imagePickerLauncher.launch(new PickVisualMediaRequest.Builder()
+                .setMediaType(ActivityResultContracts.PickVisualMedia.ImageOnly.INSTANCE)
+                .build()));
         
         btnSave.setOnClickListener(v -> {
             String name = etName.getText().toString().trim();

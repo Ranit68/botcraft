@@ -10,6 +10,9 @@ import android.util.Log;
 import android.view.*;
 import android.widget.*;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.PickVisualMediaRequest;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -51,6 +54,15 @@ public class CreateBotStep1Fragment extends Fragment {
     private BotViewModel botViewModel;
     private User currentUser;
     private ListenerRegistration userListener;
+
+    private final ActivityResultLauncher<PickVisualMediaRequest> imagePickerLauncher = registerForActivityResult(
+            new ActivityResultContracts.PickVisualMedia(),
+            uri -> {
+                if (uri != null) {
+                    setBotImage(uri.toString());
+                }
+            }
+    );
 
     public CreateBotStep1Fragment() {}
 
@@ -153,8 +165,9 @@ public class CreateBotStep1Fragment extends Fragment {
     }
 
     private void openGallery() {
-        Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
-        startActivityForResult(intent, PICK_IMAGE);
+        imagePickerLauncher.launch(new PickVisualMediaRequest.Builder()
+                .setMediaType(ActivityResultContracts.PickVisualMedia.ImageOnly.INSTANCE)
+                .build());
     }
 
     private void updateGenderUI() {
@@ -186,19 +199,8 @@ public class CreateBotStep1Fragment extends Fragment {
                 .commit();
     }
 
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (resultCode == Activity.RESULT_OK) {
-            if (requestCode == PICK_IMAGE && data != null) {
-                Uri selectedImageUri = data.getData();
-                if (isAdded() && selectedImageUri != null) {
-                    setBotImage(selectedImageUri.toString());
-                }
-            }
-        }
-    }
-
     private void setBotImage(String url) {
+        if (!isAdded()) return;
         imgBotProfile.setImageTintList(null);
         Glide.with(requireContext()).load(url).transform(new CircleCrop()).into(imgBotProfile);
         Bot bot = botViewModel.getBotData().getValue();
