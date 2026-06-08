@@ -32,7 +32,8 @@ async function verifyUser(req) {
 }
 
 /**
- * Resets daily usage counters when the date changes.
+ * Resets daily usage counters when 24 hours have passed.
+ * Implements a rolling 24-hour lock system.
  * @param {FirebaseFirestore.DocumentReference} userRef User document ref.
  * @param {Object} user User document data.
  * @return {Promise<void>}
@@ -40,8 +41,16 @@ async function verifyUser(req) {
 async function resetDailyIfNeeded(userRef, user) {
   const now = Date.now();
   const lastReset = user.lastResetDate || 0;
-  if (new Date(now).toDateString() !== new Date(lastReset).toDateString()) {
-    const updateData = {dailyMessageCount: 0, dailyImageCount: 0, dailyVoiceCount: 0, lastResetDate: now};
+  const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+
+  // If 24 hours have passed since the start of the last cycle, reset the counters
+  if (now - lastReset >= TWENTY_FOUR_HOURS) {
+    const updateData = {
+      dailyMessageCount: 0,
+      dailyImageCount: 0,
+      dailyVoiceCount: 0,
+      lastResetDate: now, // The new 24-hour cycle starts now
+    };
     await userRef.update(updateData);
     user.dailyMessageCount = 0; 
     user.dailyImageCount = 0;
@@ -51,7 +60,7 @@ async function resetDailyIfNeeded(userRef, user) {
 }
 
 /**
- * Downgrades expired subscriptions.
+ * Downgrades expired subscriptions to the free plan.
  * @param {FirebaseFirestore.DocumentReference} userRef User document ref.
  * @param {Object} user User document data.
  * @return {Promise<void>}
@@ -65,8 +74,8 @@ async function checkSubscription(userRef, user) {
 
 /**
  * Gets the daily message limit for a plan.
- * @param {string} plan Subscription plan name.
- * @return {number} Message limit.
+ * @param {string} plan User plan name.
+ * @return {number} Daily message limit.
  */
 function getDailyMessageLimit(plan) {
   if (plan === "premium") return 25;

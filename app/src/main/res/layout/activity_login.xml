@@ -25,15 +25,14 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
-        <ImageView
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:src="@android:drawable/ic_menu_compass"
+        <de.hdodenhof.circleimageview.CircleImageView
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:src="@drawable/icon"
             app:layout_constraintBottom_toBottomOf="@id/viewIconBg"
             app:layout_constraintEnd_toEndOf="@id/viewIconBg"
             app:layout_constraintStart_toStartOf="@id/viewIconBg"
-            app:layout_constraintTop_toTopOf="@id/viewIconBg"
-            app:tint="@color/text_main" />
+            app:layout_constraintTop_toTopOf="@id/viewIconBg"/>
 
         <TextView
             android:id="@+id/tvTitle"
@@ -53,7 +52,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="Continue your AI journey"
+            android:text="Resume your romantic journey"
             android:textColor="@color/text_label"
             android:textSize="16sp"
             app:layout_constraintEnd_toEndOf="parent"

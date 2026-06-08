@@ -165,6 +165,15 @@
                 app:cornerRadius="16dp"
                 app:elevation="4dp" />
 
+            <ProgressBar
+                android:id="@+id/pbEditProfile"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:indeterminate="true"
+                android:visibility="gone" />
+
         </LinearLayout>
     </ScrollView>
 </androidx.cardview.widget.CardView>

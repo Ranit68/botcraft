@@ -21,7 +21,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_centerHorizontal="true"
-                android:text="BotsCraft"
+                android:text="SoulBound"
                 android:textColor="#E0E0E0"
                 android:textSize="16sp"
                 android:textStyle="bold" />
@@ -55,7 +55,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
             android:gravity="center"
-            android:text="Unlock Premium AI\nExperience 🚀"
+            android:text="Unlock Premium Romantic\nExperience ❤️"
             android:textColor="@color/white"
             android:textSize="24sp"
             android:textStyle="bold" />
@@ -92,7 +92,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="16dp"
-                    android:text="Unlimited AI Chat 💬"
+                    android:text="Unlimited Heartfelt Chats 💬"
                     android:textColor="@color/white" />
             </LinearLayout>
 
@@ -134,7 +134,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="16dp"
-                    android:text="Faster AI Responses ⚡"
+                    android:text="Instant Connections ⚡"
                     android:textColor="@color/white" />
             </LinearLayout>
         </LinearLayout>

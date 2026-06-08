@@ -30,7 +30,7 @@
             android:id="@+id/imgLogo"
             android:layout_width="45dp"
             android:layout_height="45dp"
-            android:src="@drawable/app_icon"
+            android:src="@drawable/icon"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
@@ -50,7 +50,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:fontFamily="@font/poppins_bold"
-                android:text="Bot"
+                android:text="Soul"
                 android:textColor="@color/text_main"
                 android:textSize="20sp" />
 
@@ -58,7 +58,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:fontFamily="@font/poppins_bold"
-                android:text="Craft"
+                android:text="Bound"
                 android:textColor="@color/accent_purple"
                 android:textSize="20sp" />
         </LinearLayout>

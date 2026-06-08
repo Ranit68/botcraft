@@ -226,7 +226,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:alpha="0.5"
-                        android:text="BOTS CREATED"
+                        android:text="SOULS CONNECTED"
                         android:textColor="@color/text_main"
                         android:textSize="9sp"
                         android:textStyle="bold" />
@@ -390,7 +390,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="16dp"
                     android:layout_weight="1"
-                    android:text="Blocked Bots"
+                    android:text="Blocked Matches"
                     android:textColor="@color/text_main"
                     android:textSize="16sp" />
 
@@ -494,34 +494,6 @@
                     android:layout_height="wrap_content" />
             </LinearLayout>
 
-            <!-- Security PIN Lock -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:paddingHorizontal="24dp"
-                android:paddingVertical="14dp">
-
-                <ImageView
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
-                    android:src="@android:drawable/ic_lock_idle_lock"
-                    app:tint="@color/text_main" />
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp"
-                    android:layout_weight="1"
-                    android:text="PIN Lock"
-                    android:textColor="@color/text_main"
-                    android:textSize="16sp" />
-
-                <com.google.android.material.materialswitch.MaterialSwitch
-                    android:id="@+id/switchPinLock"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-            </LinearLayout>
 
             <!-- Fingerprint Unlock -->
             <LinearLayout
@@ -579,7 +551,7 @@
             android:layout_marginTop="24dp"
             android:alpha="0.2"
             android:letterSpacing="0.1"
-            android:text="DIGITAL CONFIDANT V2.4.0"
+            android:text="SOULBOUND V2.4.0"
             android:textColor="@color/text_main"
             android:textSize="10sp"
             android:textStyle="bold"

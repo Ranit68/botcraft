@@ -2,17 +2,16 @@ package com.ranit.botscraft.ui;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.text.Editable;
-import android.text.TextWatcher;
 import android.view.View;
-import android.widget.EditText;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.biometric.BiometricManager;
 import androidx.biometric.BiometricPrompt;
 import androidx.core.content.ContextCompat;
 
+import com.google.firebase.auth.FirebaseAuth;
 import com.ranit.botscraft.R;
 import com.ranit.botscraft.firebase.FirebaseManager;
 import com.ranit.botscraft.model.User;
@@ -21,42 +20,27 @@ import java.util.concurrent.Executor;
 
 public class SecurityActivity extends AppCompatActivity {
 
-    private EditText etPin;
-    private String correctPin;
-    private boolean isBiometricEnabled;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_security);
 
-        etPin = findViewById(R.id.etPinEntry);
-        View btnUnlock = findViewById(R.id.btnUnlock);
         View btnFingerprint = findViewById(R.id.btnFingerprint);
+        View btnLogout = findViewById(R.id.btnLogoutSecurity);
+
+        if (btnFingerprint != null) {
+            btnFingerprint.setOnClickListener(v -> showBiometricPrompt());
+        }
+
+        if (btnLogout != null) {
+            btnLogout.setOnClickListener(v -> {
+                FirebaseAuth.getInstance().signOut();
+                startActivity(new Intent(SecurityActivity.this, LoginActivity.class));
+                finish();
+            });
+        }
 
         fetchSecuritySettings();
-
-        etPin.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
-            @Override public void afterTextChanged(Editable s) {
-                if (s.length() == 4) {
-                    validatePin(s.toString());
-                }
-            }
-        });
-
-        btnUnlock.setOnClickListener(v -> validatePin(etPin.getText().toString()));
-        btnFingerprint.setOnClickListener(v -> showBiometricPrompt());
-    }
-
-    private void validatePin(String entered) {
-        if (correctPin != null && entered.equals(correctPin)) {
-            unlockApp();
-        } else if (entered.length() == 4) {
-            Toast.makeText(this, "Incorrect PIN", Toast.LENGTH_SHORT).show();
-            etPin.setText("");
-        }
     }
 
     private void fetchSecuritySettings() {
@@ -69,15 +53,15 @@ public class SecurityActivity extends AppCompatActivity {
         FirebaseManager.getFirestore().collection("users").document(uid).get().addOnSuccessListener(doc -> {
             User user = doc.toObject(User.class);
             if (user != null) {
-                correctPin = user.pinCode;
-                isBiometricEnabled = user.biometricEnabled;
-
-                if (isBiometricEnabled) {
-                    findViewById(R.id.btnFingerprint).setVisibility(View.VISIBLE);
+                if (!user.biometricEnabled) {
+                    unlockApp();
+                } else {
                     showBiometricPrompt();
                 }
+            } else {
+                unlockApp();
             }
-        });
+        }).addOnFailureListener(e -> unlockApp());
     }
 
     private void showBiometricPrompt() {
@@ -86,6 +70,10 @@ public class SecurityActivity extends AppCompatActivity {
             @Override
             public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
                 super.onAuthenticationError(errorCode, errString);
+                // Don't show toast for user cancellation
+                if (errorCode != BiometricPrompt.ERROR_USER_CANCELED && errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
+                    Toast.makeText(SecurityActivity.this, errString, Toast.LENGTH_SHORT).show();
+                }
             }
 
             @Override
@@ -100,13 +88,12 @@ public class SecurityActivity extends AppCompatActivity {
             }
         });
 
-        BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
-                .setTitle("Biometric Unlock")
-                .setSubtitle("Use your fingerprint to unlock BotCraft")
-                .setNegativeButtonText("Use PIN")
-                .build();
+        BiometricPrompt.PromptInfo.Builder builder = new BiometricPrompt.PromptInfo.Builder()
+                .setTitle("App Locked")
+                .setSubtitle("Use biometric or screen lock to continue")
+                .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG | BiometricManager.Authenticators.DEVICE_CREDENTIAL);
 
-        biometricPrompt.authenticate(promptInfo);
+        biometricPrompt.authenticate(builder.build());
     }
 
     private void unlockApp() {

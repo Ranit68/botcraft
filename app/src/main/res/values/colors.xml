@@ -6,16 +6,18 @@
     <color name="secondary">#9B8CFF</color>
     
     <!-- Modern Palette -->
-    <color name="bg_main">#F7F8FC</color>
+    <color name="bg_main">#FFF5F7</color>
     <color name="bg_card">#FFFFFF</color>
-    <color name="bg_input">#F1F2F6</color>
+    <color name="bg_input">#FFF0F3</color>
     <color name="text_main">#1C1C1E</color>
     <color name="text_hint">#8E8E93</color>
     <color name="text_label">#6B6B6F</color>
-    <color name="stroke_input">#E0E3EB</color>
+    <color name="stroke_input">#F5E1E5</color>
     <color name="accent_purple">#8B80F9</color>
-    <color name="accent_purple_light">#E0DBFF</color>
+    <color name="accent_purple_light">#F3E8FF</color>
+    <color name="accent_pink_soft">#FFF0F2</color>
     <color name="splash_icon_bg">#FFFFFF</color>
+
     <color name="splash_text_main">#1C1C1E</color>
     <color name="splash_tagline">#8B80F9</color>
     <color name="splash_status_bg">#1A8B80F9</color>
@@ -24,5 +26,5 @@
     <color name="grad_end">#B3A9FF</color>
     <color name="white">#FFFFFF</color>
     <color name="black">#000000</color>
-    <color name="surface_variant">#F1F2F6</color>
+    <color name="surface_variant">#FFF0F3</color>
 </resources>

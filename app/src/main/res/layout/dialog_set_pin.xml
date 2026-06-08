@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_dialog_rounded"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:id="@+id/tvPinTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Secure Your Chats"
+        android:textColor="@color/text_main"
+        android:textSize="20sp"
+        android:fontFamily="@font/poppins_bold" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Set a 4-digit PIN to protect your privacy."
+        android:textColor="@color/text_main"
+        android:alpha="0.7"
+        android:textSize="13sp"
+        android:fontFamily="@font/poppins_regular" />
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        app:hintEnabled="false"
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+
+        <EditText
+            android:id="@+id/etPinInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:hint="••••"
+            android:inputType="numberPassword"
+            android:letterSpacing="1.0"
+            android:maxLength="4"
+            android:textColor="@color/text_main"
+            android:textSize="28sp"
+            android:paddingVertical="12dp"
+            android:background="@drawable/bg_search_bar"
+            android:autofillHints="password" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnSavePin"
+        android:layout_width="match_parent"
+        android:layout_height="54dp"
+        android:layout_marginTop="24dp"
+        android:text="Set PIN Code"
+        android:fontFamily="@font/poppins_bold"
+        android:textAllCaps="false"
+        app:cornerRadius="16dp"
+        app:backgroundTint="@color/primary" />
+
+    <TextView
+        android:id="@+id/btnCancelPin"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:gravity="center"
+        android:text="Not Now"
+        android:textColor="@color/text_main"
+        android:alpha="0.5"
+        android:textSize="14sp"
+        android:padding="8dp"
+        android:fontFamily="@font/poppins_medium" />
+
+</LinearLayout>

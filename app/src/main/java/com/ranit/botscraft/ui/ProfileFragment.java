@@ -3,15 +3,20 @@ package com.ranit.botscraft.ui;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.content.Context;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.content.res.Configuration;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.util.Log;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -87,7 +92,7 @@ public class ProfileFragment extends Fragment implements PurchasesUpdatedListene
     private ShapeableImageView imgProfile;
     private TextView tvUserName, tvUserEmail, tvPlanName, tvCreditsValue, tvBotsCount, tvChatsCount, tvImagesCount;
     private ProgressBar pbCredits;
-    private MaterialSwitch switchTheme, switchNotifications, switchPinLock, switchBiometric;
+    private MaterialSwitch switchTheme, switchNotifications, switchBiometric;
     private View btnLogout, cvImagesCount, cvBotsCount, btnUpgrade, btnEditProfile, btnBlockedBots, btnAccountSettings, btnPrivacySecurity, llBiometric;
     private FirebaseFirestore db;
     private String uid;
@@ -103,9 +108,13 @@ public class ProfileFragment extends Fragment implements PurchasesUpdatedListene
             new ActivityResultContracts.PickVisualMedia(),
             uri -> {
                 if (uri != null) {
-                    if (dialogProfileImage != null) {
-                        Glide.with(this).load(uri).circleCrop().into(dialogProfileImage);
-                        selectedImageUri = uri;
+                    selectedImageUri = uri;
+                    if (dialogProfileImage != null && isAdded()) {
+                        try {
+                            Glide.with(this).load(uri).circleCrop().into(dialogProfileImage);
+                        } catch (Exception e) {
+                            Log.e(TAG, "Glide load failed", e);
+                        }
                     }
                 }
             }
@@ -162,7 +171,6 @@ public class ProfileFragment extends Fragment implements PurchasesUpdatedListene
         pbCredits = view.findViewById(R.id.pbCredits);
         switchTheme = view.findViewById(R.id.switchTheme);
         switchNotifications = view.findViewById(R.id.switchNotifications);
-        switchPinLock = view.findViewById(R.id.switchPinLock);
         switchBiometric = view.findViewById(R.id.switchBiometric);
         llBiometric = view.findViewById(R.id.llBiometric);
         checkBiometricSupport();
@@ -193,22 +201,11 @@ public class ProfileFragment extends Fragment implements PurchasesUpdatedListene
             }
         });
 
-        if (switchPinLock != null) {
-            switchPinLock.setOnCheckedChangeListener((button, isChecked) -> {
-                if (currentUser == null) return;
-                if (isChecked && (currentUser.pinCode == null || currentUser.pinCode.isEmpty())) {
-                    showSetPinDialog();
-                } else {
-                    db.collection("users").document(uid).update("securityEnabled", isChecked);
-                    saveSecurityPreference(isChecked);
-                }
-            });
-        }
-
         if (switchBiometric != null) {
             switchBiometric.setOnCheckedChangeListener((button, isChecked) -> {
                 if (uid != null) {
                     db.collection("users").document(uid).update("biometricEnabled", isChecked);
+                    saveSecurityPreference(isChecked);
                 }
             });
         }
@@ -403,9 +400,6 @@ public class ProfileFragment extends Fragment implements PurchasesUpdatedListene
                     pbCredits.setProgress(currentUser.credits);
                     switchNotifications.setChecked(currentUser.notificationsEnabled);
                     
-                    if (switchPinLock != null) {
-                        switchPinLock.setChecked(currentUser.securityEnabled);
-                    }
                     if (switchBiometric != null) {
                         switchBiometric.setChecked(currentUser.biometricEnabled);
                     }
@@ -648,6 +642,7 @@ public class ProfileFragment extends Fragment implements PurchasesUpdatedListene
 
     private void showEditProfileDialog() {
         if (currentUser == null) return;
+        selectedImageUri = null; // Reset for new dialog session
         Dialog dialog = new Dialog(requireContext());
         dialog.setContentView(R.layout.dialog_edit_profile);
         if (dialog.getWindow() != null) {
@@ -662,6 +657,7 @@ public class ProfileFragment extends Fragment implements PurchasesUpdatedListene
         RadioButton rbFemale = dialog.findViewById(R.id.rbFemale);
         RadioButton rbOther = dialog.findViewById(R.id.rbOther);
         MaterialButton btnSave = dialog.findViewById(R.id.btnSaveProfile);
+        ProgressBar progressBar = dialog.findViewById(R.id.pbEditProfile);
 
         etName.setText(currentUser.name);
 
@@ -692,67 +688,112 @@ public class ProfileFragment extends Fragment implements PurchasesUpdatedListene
             if (checkedId == R.id.rbMale) gender = "Male";
             else if (checkedId == R.id.rbFemale) gender = "Female";
 
-            if (selectedImageUri != null) uploadProfileImage(selectedImageUri, name, gender, dialog);
-            else updateProfileData(name, gender, null, dialog);
+            if (selectedImageUri != null) {
+                if (progressBar != null) progressBar.setVisibility(View.VISIBLE);
+                btnSave.setEnabled(false);
+                uploadProfileImage(selectedImageUri, name, gender, dialog, progressBar, btnSave);
+            } else {
+                updateProfileData(name, gender, null, dialog);
+            }
         });
         dialog.show();
     }
 
-    private void uploadProfileImage(Uri uri, String name, String gender, Dialog dialog) {
-        StorageReference ref = FirebaseManager.getStorage().getReference().child("profiles/" + uid + ".jpg");
-        ref.putFile(uri).addOnSuccessListener(ts -> ref.getDownloadUrl().addOnSuccessListener(dUri -> updateProfileData(name, gender, dUri.toString(), dialog)));
+    private void uploadProfileImage(Uri uri, String name, String gender, Dialog dialog, ProgressBar progressBar, View btnSave) {
+        if (uid == null) return;
+        Context context = getContext();
+        if (context == null) return;
+        final Context appContext = context.getApplicationContext();
+
+        new Thread(() -> {
+            try {
+                // Get dimensions
+                BitmapFactory.Options options = new BitmapFactory.Options();
+                options.inJustDecodeBounds = true;
+                try (InputStream is1 = appContext.getContentResolver().openInputStream(uri)) {
+                    BitmapFactory.decodeStream(is1, null, options);
+                }
+
+                // Calculate sample size
+                int reqWidth = 800;
+                int reqHeight = 800;
+                int inSampleSize = 1;
+                if (options.outHeight > reqHeight || options.outWidth > reqWidth) {
+                    final int halfHeight = options.outHeight / 2;
+                    final int halfWidth = options.outWidth / 2;
+                    while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
+                        inSampleSize *= 2;
+                    }
+                }
+                options.inSampleSize = inSampleSize;
+                options.inJustDecodeBounds = false;
+
+                // Decode with sample size
+                Bitmap bitmap;
+                try (InputStream is2 = appContext.getContentResolver().openInputStream(uri)) {
+                    bitmap = BitmapFactory.decodeStream(is2, null, options);
+                }
+
+                if (bitmap == null) {
+                    throw new Exception("Bitmap decoding failed");
+                }
+
+                // Further scaling if needed for exact dimensions
+                if (bitmap.getWidth() > reqWidth || bitmap.getHeight() > reqHeight) {
+                    float aspectRatio = (float) bitmap.getWidth() / (float) bitmap.getHeight();
+                    int width = reqWidth;
+                    int height = Math.round(width / aspectRatio);
+                    Bitmap scaled = Bitmap.createScaledBitmap(bitmap, width, height, true);
+                    if (scaled != bitmap) {
+                        bitmap.recycle();
+                        bitmap = scaled;
+                    }
+                }
+
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos);
+                byte[] data = baos.toByteArray();
+                bitmap.recycle();
+
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        StorageReference ref = FirebaseManager.getStorage().getReference().child("profiles/" + uid + ".jpg");
+                        ref.putBytes(data).addOnSuccessListener(ts -> ref.getDownloadUrl().addOnSuccessListener(dUri -> {
+                            updateProfileData(name, gender, dUri.toString(), dialog);
+                        })).addOnFailureListener(e -> {
+                            if (progressBar != null) progressBar.setVisibility(View.GONE);
+                            if (btnSave != null) btnSave.setEnabled(true);
+                            Toast.makeText(appContext, "Upload failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        });
+                    });
+                }
+            } catch (Throwable t) {
+                Log.e(TAG, "Image processing failed", t);
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        if (progressBar != null) progressBar.setVisibility(View.GONE);
+                        if (btnSave != null) btnSave.setEnabled(true);
+                        Toast.makeText(appContext, "Error processing image", Toast.LENGTH_SHORT).show();
+                    });
+                }
+            }
+        }).start();
     }
 
     private void updateProfileData(String name, String gender, @Nullable String imageUrl, Dialog dialog) {
+        if (uid == null) return;
         Map<String, Object> updates = new HashMap<>();
         updates.put("name", name);
         updates.put("gender", gender);
         if (imageUrl != null) updates.put("imageUrl", imageUrl);
         db.collection("users").document(uid).update(updates).addOnSuccessListener(aVoid -> {
-            Toast.makeText(getContext(), "Profile updated", Toast.LENGTH_SHORT).show();
-            dialog.dismiss();
+            if (isAdded()) Toast.makeText(getContext(), "Profile updated", Toast.LENGTH_SHORT).show();
+            if (dialog != null && dialog.isShowing()) dialog.dismiss();
+        }).addOnFailureListener(e -> {
+            if (isAdded()) Toast.makeText(getContext(), "Update failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         });
     }
 
-    private void showSetPinDialog() {
-        Dialog dialog = new Dialog(requireContext());
-        dialog.setContentView(R.layout.dialog_edit_profile); // Reusing layout for simplicity or create new
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        }
-
-        // Custom PIN dialog would be better, but let's use a quick one
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-        builder.setTitle("Set Security PIN");
-        
-        final EditText input = new EditText(requireContext());
-        input.setHint("4-digit PIN");
-        input.setGravity(android.view.Gravity.CENTER);
-        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD);
-        input.setFilters(new android.text.InputFilter[] { new android.text.InputFilter.LengthFilter(4) });
-        input.setLetterSpacing(0.5f);
-        builder.setView(input);
-
-        builder.setPositiveButton("Set", (d, w) -> {
-            String pin = input.getText().toString().trim();
-            if (pin.length() == 4) {
-                db.collection("users").document(uid).update(
-                    "pinCode", pin,
-                    "securityEnabled", true
-                ).addOnSuccessListener(aVoid -> {
-                    Toast.makeText(getContext(), "PIN Set Successfully", Toast.LENGTH_SHORT).show();
-                    saveSecurityPreference(true);
-                });
-            } else {
-                Toast.makeText(getContext(), "PIN too short", Toast.LENGTH_SHORT).show();
-                switchPinLock.setChecked(false);
-            }
-        });
-        builder.setNegativeButton("Cancel", (d, w) -> switchPinLock.setChecked(false));
-        builder.setCancelable(false);
-        builder.show();
-    }
 
     private void openImageViewer() {
         if (uid == null) return;
@@ -788,9 +829,9 @@ public class ProfileFragment extends Fragment implements PurchasesUpdatedListene
     }
 
     private void saveSecurityPreference(boolean enabled) {
-        if (getContext() == null) return;
+        if (getContext() == null || uid == null) return;
         android.content.SharedPreferences prefs = getContext().getSharedPreferences("app_security", android.content.Context.MODE_PRIVATE);
-        prefs.edit().putBoolean("security_enabled", enabled).apply();
+        prefs.edit().putBoolean("biometric_enabled_" + uid, enabled).apply();
     }
 
     private void checkBiometricSupport() {

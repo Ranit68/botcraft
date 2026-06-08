@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.net.ConnectivityManager;
 import android.net.NetworkCapabilities;
 import android.os.Bundle;
+import android.os.CountDownTimer;
 import android.util.Base64;
 import android.util.Log;
 import android.view.View;
@@ -64,11 +65,10 @@ public class ChatActivity extends AppCompatActivity implements ChatAdapter.OnCha
     private EditText etMessage;
     private View btnSend; 
     private ImageView imgBotHeader, btnBack, btnMenu;
-    private TextView tvBotNameHeader;
+    private TextView tvBotNameHeader, tvCountdown;
     private ConstraintLayout mainLayout;
     private View llInputArea, llLimitArea;
     private ProgressBar progressbar;
-    
     @Nullable private Bot bot;
     private String botId = "";
     @Nullable private User currentUser;
@@ -79,24 +79,21 @@ public class ChatActivity extends AppCompatActivity implements ChatAdapter.OnCha
     private boolean isWaitingForReply = false;
     private InterstitialAd mInterstitialAd;
     private boolean limitAdShown = false;
-
+    private CountDownTimer limitTimer;
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_chat);
-
         Object botObj = getIntent().getSerializableExtra("bot");
         if (botObj instanceof Bot) {
             bot = (Bot) botObj;
             botId = bot.botId != null ? bot.botId : "";
         }
-
         if (bot == null || botId.isEmpty()) { 
             Log.e(TAG, "Bot data missing");
             finish(); 
             return; 
         }
-
         initViews();
         listenToUserUpdates();
         setupChat();
@@ -105,7 +102,6 @@ public class ChatActivity extends AppCompatActivity implements ChatAdapter.OnCha
         loadWallpaper();
         loadInterstitialAd();
     }
-
     private void loadInterstitialAd() {
         AdRequest adRequest = new AdRequest.Builder().build();
         InterstitialAd.load(this, INTERSTITIAL_AD_ID, adRequest, new InterstitialAdLoadCallback() {
@@ -126,12 +122,12 @@ public class ChatActivity extends AppCompatActivity implements ChatAdapter.OnCha
         tvBotNameHeader = findViewById(R.id.tvBotNameHeader);
         llInputArea = findViewById(R.id.llInputArea);
         llLimitArea = findViewById(R.id.llLimitArea);
+        tvCountdown = findViewById(R.id.tvCountdown);
         progressbar = findViewById(R.id.progressbar);
         updateBotUI();
         btnBack.setOnClickListener(v -> finish());
         btnSend.setOnClickListener(v -> sendMessage());
         btnMenu.setOnClickListener(this::showPopupMenu);
-
         View.OnClickListener profileOpener = v -> {
             if (bot != null) {
                 bot.sanitizeForIntent(); 
@@ -140,17 +136,14 @@ public class ChatActivity extends AppCompatActivity implements ChatAdapter.OnCha
                 startActivity(intent);
             }
         };
-
         imgBotHeader.setOnClickListener(profileOpener);
         tvBotNameHeader.setOnClickListener(profileOpener);
     }
-
     private void showPopupMenu(View view) {
         PopupMenu popup = new PopupMenu(this, view);
         popup.getMenu().add("Clear Chat");
         popup.getMenu().add("Report Bot");
         popup.getMenu().add("Block Bot");
-        
         popup.setOnMenuItemClickListener(item -> {
             String title = item.getTitle().toString();
             switch (title) {
@@ -173,7 +166,6 @@ public class ChatActivity extends AppCompatActivity implements ChatAdapter.OnCha
     private void submitReport(String reason) {
         String uid = FirebaseManager.getUserId();
         if (uid == null || botId.isEmpty()) return;
-
         Map<String, Object> report = new HashMap<>();
         report.put("userId", uid);
         report.put("botId", botId);
@@ -213,7 +205,6 @@ public class ChatActivity extends AppCompatActivity implements ChatAdapter.OnCha
             });
         });
     }
-
     private void listenToUserUpdates() {
         String uid = FirebaseManager.getUserId();
         if (uid == null) return;
@@ -224,44 +215,105 @@ public class ChatActivity extends AppCompatActivity implements ChatAdapter.OnCha
             }
         });
     }
-
     private void checkLimits() {
         if (currentUser == null) return;
+
+        long now = System.currentTimeMillis();
+        long lockDuration = 24 * 60 * 60 * 1000;
+        boolean hasExpired = (now - currentUser.lastResetDate) >= lockDuration;
+
         int max = "free".equals(currentUser.plan) ? 5 : ("premium".equals(currentUser.plan) ? 25 : 75);
-        boolean canMessage = (currentUser.dailyMessageCount < max) || (currentUser.credits >= 1);
+        
+        // Rolling 24h logic: User is allowed if they have NOT reached the limit OR 24h has passed since reset
+        boolean canMessage = hasExpired || (currentUser.dailyMessageCount < max) || (currentUser.credits >= 1);
         
         llInputArea.setVisibility(canMessage ? View.VISIBLE : View.GONE);
         llLimitArea.setVisibility(canMessage ? View.GONE : View.VISIBLE);
 
-        if (!canMessage && "free".equals(currentUser.plan) && !limitAdShown) {
-            if (mInterstitialAd != null) {
-                mInterstitialAd.show(this);
-                limitAdShown = true;
-                loadInterstitialAd();
+        if (hasExpired && (currentUser.dailyMessageCount > 0 || currentUser.dailyImageCount > 0)) {
+            // Trigger a rolling reset on Firestore
+            String uid = FirebaseManager.getUserId();
+            if (uid != null) {
+                Map<String, Object> resetData = new HashMap<>();
+                resetData.put("dailyMessageCount", 0);
+                resetData.put("dailyImageCount", 0);
+                resetData.put("dailyVoiceCount", 0);
+                resetData.put("lastResetDate", now);
+                FirebaseManager.getFirestore().collection("users").document(uid).update(resetData);
             }
-        } else if (canMessage) {
+        }
+
+        if (!canMessage) {
+            startLimitCountdown();
+            if ("free".equals(currentUser.plan) && !limitAdShown) {
+                if (mInterstitialAd != null) {
+                    mInterstitialAd.show(this);
+                    limitAdShown = true;
+                    loadInterstitialAd();
+                }
+            }
+        } else {
             limitAdShown = false;
+            if (limitTimer != null) {
+                limitTimer.cancel();
+                limitTimer = null;
+            }
         }
     }
 
+    private boolean isSameDay(long t1, long t2) {
+        if (t2 == 0) return false;
+        java.util.Calendar cal1 = java.util.Calendar.getInstance();
+        cal1.setTimeInMillis(t1);
+        java.util.Calendar cal2 = java.util.Calendar.getInstance();
+        cal2.setTimeInMillis(t2);
+        return cal1.get(java.util.Calendar.YEAR) == cal2.get(java.util.Calendar.YEAR) &&
+               cal1.get(java.util.Calendar.DAY_OF_YEAR) == cal2.get(java.util.Calendar.DAY_OF_YEAR);
+    }
+
+    private void startLimitCountdown() {
+        if (limitTimer != null || currentUser == null) return;
+        
+        long lockDuration = 24 * 60 * 60 * 1000;
+        long diff = (currentUser.lastResetDate + lockDuration) - System.currentTimeMillis();
+        
+        if (diff <= 0) {
+            checkLimits();
+            return;
+        }
+
+        limitTimer = new CountDownTimer(diff, 1000) {
+            @Override
+            public void onTick(long millisUntilFinished) {
+                long h = millisUntilFinished / (1000 * 60 * 60);
+                long m = (millisUntilFinished / (1000 * 60)) % 60;
+                long s = (millisUntilFinished / 1000) % 60;
+                if (tvCountdown != null) {
+                    tvCountdown.setText(String.format(java.util.Locale.US, "Resets in: %02d:%02d:%02d", h, m, s));
+                }
+            }
+            @Override
+            public void onFinish() {
+                limitTimer = null;
+                checkLimits();
+            }
+        }.start();
+    }
     private void updateBotUI() {
         if (bot == null) return;
         tvBotNameHeader.setText(bot.getDisplayName());
         if (bot.imageUrl != null) Glide.with(this).load(bot.imageUrl).circleCrop().into(imgBotHeader);
     }
-
     private void listenToBotUpdates() {
         botListener = FirebaseManager.getFirestore().collection("bots").document(botId).addSnapshotListener((snap, e) -> {
             if (snap != null && snap.exists()) { bot = snap.toObject(Bot.class); updateBotUI(); }
         });
     }
-
     private void setupChat() {
         adapter = new ChatAdapter(messageList, this);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         recyclerView.setAdapter(adapter);
     }
-
     @Override public void onVoiceClick(ChatMessage msg) {}
     @Override public void onImageClick(String url) {
         if (url == null || url.isEmpty()) return;
@@ -271,7 +323,6 @@ public class ChatActivity extends AppCompatActivity implements ChatAdapter.OnCha
         Intent intent = new Intent(this, ImageViewerActivity.class);
         startActivity(intent);
     }
-
     private void listenToMessages() {
         String uid = FirebaseManager.getUserId();
         if (uid == null) return;
@@ -310,8 +361,6 @@ public class ChatActivity extends AppCompatActivity implements ChatAdapter.OnCha
                                 com.google.firebase.Timestamp ts = doc.getTimestamp("createdAt");
                                 if (ts != null) {
                                     msg.timestamp = ts.toDate().getTime();
-                                    // If we find an image that was created in the last 10 seconds, 
-                                    // we consider the generation "finished" from the perspective of showing it.
                                     if (imageUrl != null && !imageUrl.isEmpty() && (now - msg.timestamp < 10000)) {
                                         hasRecentImage = true;
                                     }
@@ -319,7 +368,6 @@ public class ChatActivity extends AppCompatActivity implements ChatAdapter.OnCha
                                 messageList.add(msg);
                             }
                         }
-
                         if (!messageList.isEmpty()) {
                             ChatMessage lastMsg = messageList.get(messageList.size() - 1);
                             if ("assistant".equals(lastMsg.role)) {
@@ -327,26 +375,21 @@ public class ChatActivity extends AppCompatActivity implements ChatAdapter.OnCha
                                 if (lastMsg.imageUrl != null) adapter.setGenerating(false);
                             }
                         }
-                        
                         if (hasRecentImage) {
                             adapter.setGenerating(false);
                         }
-
                         adapter.setTyping(isWaitingForReply);
                         adapter.notifyDataSetChanged();
                         scrollToBottom();
                     }
                 });
     }
-
     @Override
     public void onUnlockImageClick(ChatMessage message, int position) {
         if (currentUser == null) return;
-        
         String plan = currentUser.plan != null ? currentUser.plan : "free";
         String messageText = "Unlock this exclusive photo for 50 credits.";
         String positiveButton = "Pay 50 Credits";
-        
         MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(this)
                 .setTitle("Unlock Photo")
                 .setMessage(messageText)
@@ -358,7 +401,6 @@ public class ChatActivity extends AppCompatActivity implements ChatAdapter.OnCha
                         startActivity(new Intent(this, BuyCreditsActivity.class));
                     }
                 });
-
         if (!"ultra".equalsIgnoreCase(plan)) {
             builder.setNeutralButton("Upgrade Plan", (dialog, which) -> {
                 Intent intent = new Intent(this, MainActivity.class);
@@ -370,15 +412,12 @@ public class ChatActivity extends AppCompatActivity implements ChatAdapter.OnCha
         
         builder.setNegativeButton("Cancel", null).show();
     }
-
     private void unlockImageWithCredits(ChatMessage message, int position) {
         String uid = FirebaseManager.getUserId();
         if (uid == null) return;
         
         FirebaseFirestore db = FirebaseManager.getFirestore();
         WriteBatch batch = db.batch();
-        
-        // Find the message in Firestore
         db.collection("chats")
                 .whereEqualTo("userId", uid)
                 .whereEqualTo("botId", botId)
@@ -401,7 +440,6 @@ public class ChatActivity extends AppCompatActivity implements ChatAdapter.OnCha
                     }
                 });
     }
-
     private void sendMessage() {
         String text = etMessage.getText().toString().trim();
         if (text.isEmpty()) return;
@@ -410,7 +448,6 @@ public class ChatActivity extends AppCompatActivity implements ChatAdapter.OnCha
             Toast.makeText(this, "Wait for bot to load...", Toast.LENGTH_SHORT).show();
             return;
         }
-
         String uid = FirebaseManager.getUserId();
         if (uid == null) return;
 
@@ -451,18 +488,21 @@ public class ChatActivity extends AppCompatActivity implements ChatAdapter.OnCha
 
     private boolean canRequestImage() {
         if (currentUser == null) return false;
-        // User wants generation to proceed anyway if possible, but locked if over limit.
-        // So we only block if they have NO chance to see it (unlikely given requirement).
         return true; 
     }
-    
     private boolean isOverImageLimit() {
         if (currentUser == null) return true;
+        
+        long now = System.currentTimeMillis();
+        boolean isResetToday = isSameDay(now, currentUser.lastResetDate);
+        
+        // If it's a new day (hasn't reset today yet), count is effectively 0
+        int effectiveImageCount = isResetToday ? currentUser.dailyImageCount : 0;
+        
         String plan = currentUser.plan != null ? currentUser.plan : "free";
         int limit = plan.equalsIgnoreCase("ultra") ? 5 : (plan.equalsIgnoreCase("premium") ? 3 : 1);
-        return currentUser.dailyImageCount >= limit;
+        return effectiveImageCount >= limit;
     }
-
     private boolean isImageRequest(String text) {
         if (text == null) return false;
         String lower = text.toLowerCase().trim();
@@ -473,8 +513,6 @@ public class ChatActivity extends AppCompatActivity implements ChatAdapter.OnCha
         );
         boolean hasKeyword = false;
         for (String k : keywords) { if (lower.contains(k)) { hasKeyword = true; break; } }
-        
-        // If keyword exists and message is short or has pronouns, it's likely a request
         return hasKeyword && (lower.length() < 30 || lower.contains("you") || lower.contains("me") || lower.contains("your") || lower.contains("my") || 
                 lower.contains("send") || lower.contains("show") || lower.contains("pathao") || lower.contains("dekhao") || lower.contains("dikhao"));
     }
@@ -586,7 +624,6 @@ public class ChatActivity extends AppCompatActivity implements ChatAdapter.OnCha
                             String errorBody = response.errorBody() != null ? response.errorBody().string() : "Unknown Error";
                             Log.e(TAG, "Image API Error " + response.code() + ": " + errorBody);
 
-                            // 🔥 If safety error and not already retried, try again with a safe prompt
                             if (!isSafeRetry && (errorBody.toLowerCase().contains("safety") || response.code() == 400)) {
                                 Log.d(TAG, "Retrying with safe prompt due to safety filter...");
                                 generateAndSendBotImage(promptContext, messageId, true);
@@ -630,7 +667,6 @@ public class ChatActivity extends AppCompatActivity implements ChatAdapter.OnCha
     private String constructFullImagePrompt(String context, boolean isSafeRetry) {
         if (bot == null) return context;
         
-        // Use more aesthetic and "soft" descriptive language to pass filters while staying vivid
         String base = String.format(java.util.Locale.US, "An aesthetic, high-quality artistic portrait of %s, a %d year old %s. ", 
                 bot.getDisplayName(), bot.age, bot.gender != null ? bot.gender : "person");
         
@@ -652,11 +688,9 @@ public class ChatActivity extends AppCompatActivity implements ChatAdapter.OnCha
                 .trim();
 
         if (isSafeRetry) {
-            // 🔥 If it's a safe retry, ignore the context and use a beautiful, safe alternative
             cleanContext = "posing gracefully in a beautiful setting, wearing elegant and stylish clothing, sophisticated look";
         } else {
-            // 🔥 SOFTENING LOGIC: Replace explicit keywords with "safe but related" aesthetic terms
-            cleanContext = cleanContext
+              cleanContext = cleanContext
                     .replaceAll("(?i)(naked|nude|stripped|unclothed|topless|bottomless)", "wearing elegant stylish clothes")
                     .replaceAll("(?i)(sex|xxx|porn|pussy|dick|cock|vagina|penis|fuck|oral|horny|orgasm|cum|sperm|clitoris)", "in a romantic intimate setting")
                     .replaceAll("(?i)(boobs|breasts|chest|nipples|tits)", "elegant outfit")
@@ -665,8 +699,7 @@ public class ChatActivity extends AppCompatActivity implements ChatAdapter.OnCha
         
         String scene = ". " + (cleanContext.isEmpty() ? "posing naturally" : cleanContext);
         
-        // "Soft" and aesthetic quality modifiers - explicitly adding "clothed" to avoid filter triggers
-        return base + details.toString() + scene + 
+         return base + details.toString() + scene + 
                ". Wearing beautiful tasteful clothing, soft cinematic lighting, dreamlike atmosphere, highly detailed, artistic photography, " +
                "masterpiece, soft skin textures, natural lighting, beautiful composition, no text, no watermark.";
     }
@@ -675,7 +708,6 @@ public class ChatActivity extends AppCompatActivity implements ChatAdapter.OnCha
         String uid = FirebaseManager.getUserId();
         if (uid == null) return;
 
-        // Path is more general to allow broader rules
         String path = "bot_images/chats/" + botId + "/" + System.currentTimeMillis() + ".jpg";
         StorageReference ref = FirebaseManager.getStorage().getReference().child(path);
 
@@ -692,7 +724,6 @@ public class ChatActivity extends AppCompatActivity implements ChatAdapter.OnCha
             Log.e(TAG, "Storage upload failed: " + e.getMessage(), e);
         });
     }
-
     private void saveBotImageMessage(String imageUrl, String messageId) {
         String uid = FirebaseManager.getUserId();
         if (uid == null) {
@@ -722,17 +753,14 @@ public class ChatActivity extends AppCompatActivity implements ChatAdapter.OnCha
     private void addCharacterFallbackMessage(String text) {
         String uid = FirebaseManager.getUserId();
         if (uid == null || botId.isEmpty()) return;
-        
         Map<String, Object> data = new HashMap<>();
         data.put("userId", uid);
         data.put("botId", botId);
         data.put("role", "assistant");
         data.put("text", text);
         data.put("createdAt", FieldValue.serverTimestamp());
-        
         FirebaseManager.getFirestore().collection("chats").add(data);
     }
-
     private boolean isNetworkAvailable() {
         ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         if (cm != null) {
@@ -759,5 +787,9 @@ public class ChatActivity extends AppCompatActivity implements ChatAdapter.OnCha
         if (chatListener != null) chatListener.remove();
         if (botListener != null) botListener.remove();
         if (userListener != null) userListener.remove();
+        if (limitTimer != null) {
+            limitTimer.cancel();
+            limitTimer = null;
+        }
     }
 }

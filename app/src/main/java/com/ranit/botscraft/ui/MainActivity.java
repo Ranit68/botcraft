@@ -153,6 +153,7 @@ public class MainActivity extends AppCompatActivity {
                                     }
                                 }
                                 updateToolbarProfile(user);
+                                syncSecurityPreference(user);
                                 if (!promoShown && ("free".equals(user.plan) || user.plan == null)) {
                                     showSubscriptionPromo();
                                     promoShown = true;
@@ -161,6 +162,12 @@ public class MainActivity extends AppCompatActivity {
                         }
                     });
         }
+    }
+
+    private void syncSecurityPreference(User user) {
+        if (user == null || user.uid == null) return;
+        android.content.SharedPreferences prefs = getSharedPreferences("app_security", MODE_PRIVATE);
+        prefs.edit().putBoolean("biometric_enabled_" + user.uid, user.biometricEnabled).apply();
     }
 
     private void updateToolbarProfile(User user) {
